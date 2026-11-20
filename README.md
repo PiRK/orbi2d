@@ -1,6 +1,6 @@
 # orbi2d
 
-![orbi2d: the rocket firing its engine on its current orbit (blue) around the planet, with the target orbit dashed in green](https://raw.githubusercontent.com/PiRK/orbi2d/master/docs/screenshot.png)
+![orbi2d start screen: the menu (Planetary Orbit, Lunar Transfer, Quit) next to a planet with a ship on its orbit and a moon circling it](https://raw.githubusercontent.com/PiRK/orbi2d/master/docs/screenshot.png)
 
 A 2D orbital-mechanics game in Python + Qt (PySide6). Your rocket starts on a
 random orbit. Put it on the dashed green target orbit, to within 2% (the
