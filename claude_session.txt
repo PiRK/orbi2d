@@ -1,0 +1,33 @@
+:
+>  gm. This project is a blank slate, I want to make it a 2D game with  a planet in the center of the screen, a rocket on some random orbit, another random orbit drawn on screen is the target orbit. The player need to bring the rocket into the target orbit (within a tiny tolerance margin) to win. The rocket has unlimited fuel, two side thruster that control it's orientation (activated by the left and right arrows on the keyboard), and one main thruster in the back to accelerate (activated by the Up arrow on the keyboard).The side thrusters only affect the ships orientation, we neglect their effect on the orbital trajectory. To decelerate, the player needs to rotate the ship to point the main thruster in the direction opposite to the motion. The current ships orbit needs to be drawn on screen and adjusted everytime the main thruster is fired. Orbital mechanics apply to any action on the main thruster (accelerating  at any of the two apsides moves the other apside away from the planet, decelerating at an apside moves the other apside closer to the planet, any other thrust action in any other random point of the orbit in any random direction needs to be properly modelled wrt to its effect on the orbit). Let's do this project in python + qt.
+
+
+The game is built and runs. To play it:
+
+python -m orbi2d            # optional: --seed 42
+
+It needs PySide6, which is already installed here. All 14 physics tests pass, and I rendered a test screenshot offscreen to check the drawing. I haven't played it with a real keyboard, so the feel of the controls is still untested.
+
+How it plays
+- The planet sits in the middle, the rocket starts on a random orbit (solid blue line), and the target orbit is a dashed green line. A new level gets a new random pair.
+- ←/→ fire the side thrusters, which only turn the ship. ↑ fires the main engine.
+- The blue orbit is recalculated and redrawn every frame while the engine fires. Periapsis and apoapsis are marked "Pe" and "Ap" on both orbits.
+- A yellow circle next to the ship shows the direction you're moving (prograde) and a red ✕ shows the opposite direction (retrograde), so you can see which way to point to slow down.
+- The screen also shows the numbers for your orbit and the target, how far apart they are, and how much speed change (Δv) you've spent. It warns you if you're heading into the planet or out of orbit.
+- You lose if you hit the planet or fly too far away.
+
+How the orbital mechanics work
+- Between burns, the rocket's motion is calculated exactly rather than in small approximate steps. It stays on the drawn orbit forever, and escape trajectories work too.
+- A burn is applied as many tiny speed changes along the ship's nose direction, and the orbit is recalculated from the resulting position and velocity. So a burn in any direction at any point gives the real result. The tests confirm the apsis behaviour you described, and also that a sideways burn tilts the orbit.
+
+Choices I made that you may want to change
+- Win rule: the engine must be off, and the two orbit curves must be within 2% of each other in every direction. Measuring the gap between the curves means near-circular orbits are judged fairly. Direction of travel doesn't count.
+- Extras you didn't ask for:
+  - Holding Shift gives 10% thrust and slower turning. A full-power burn is too coarse to land inside 2%, so I think this is needed.
+  - Time warp on keys 1–4, so you don't wait 20+ seconds for the far side of a big orbit.
+  - Pause (P) and new level (R).
+  - The view zooms out automatically when your orbit grows.
+- Thrust power, turn speed, the 2% tolerance and orbit sizes are all set at the top of orbi2d/game.py.
+
+The code is split into orbi2d/physics.py (orbit maths), orbi2d/game.py (rules), orbi2d/view.py (Qt display and keys) and tests/test_physics.py. The folder isn't a git repository yet. I can run git init and make a first commit if you want.
+
