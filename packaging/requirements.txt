@@ -1,0 +1,2 @@
+# Tools needed to build the standalone Windows .exe and Linux AppImage.
+pyinstaller>=6.10

@@ -29,6 +29,21 @@ From a clone of this repository:
 The game opens on the start screen: choose a mode with ↑/↓ and Enter, or
 with the mouse.
 
+## Standalone builds
+
+Each GitHub release also gets standalone builds that don't need Python:
+a Windows `.exe` and a Linux `.AppImage`. They are built by the
+[Standalone builds](.github/workflows/standalone-builds.yml) workflow. To
+build them yourself:
+
+    pip install -r requirements.txt -r packaging/requirements.txt
+    python packaging/build_exe.py        # on Windows -> dist/orbi2d-<version>-windows-x64.exe
+    python packaging/build_appimage.py   # on Linux   -> dist/orbi2d-<version>-x86_64.AppImage
+
+PyInstaller can't cross-compile, so the `.exe` must be built on Windows. An
+AppImage runs on Linux distributions at least as new as the one it was built
+on. The app icon is drawn by `packaging/make_icon.py`.
+
 ## Controls
 
 | Key            | Action                                           |

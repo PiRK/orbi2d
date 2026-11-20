@@ -12,6 +12,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 - This changelog.
+- Build scripts for a standalone Windows `.exe` (PyInstaller) and a Linux
+  AppImage, an app icon, and a GitHub workflow that attaches both to each
+  release.
 
 ## [0.2.0] - 2026-11-20
 

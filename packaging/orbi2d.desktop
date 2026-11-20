@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=orbi2d
+GenericName=Orbital mechanics game
+Comment=Steer a rocket onto a target orbit around a planet or its moon
+Exec=orbi2d
+Icon=orbi2d
+Categories=Game;Simulation;
+Keywords=space;orbit;rocket;physics;kepler;
+Terminal=false
