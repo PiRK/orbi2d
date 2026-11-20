@@ -34,12 +34,12 @@ From a clone of this repository:
 | Key            | Action                                           |
 |----------------|--------------------------------------------------|
 | ← / →          | Side thrusters: rotate the ship (orientation only) |
-| ↑              | Main engine                                      |
+| Space (or ↑)   | Main engine                                      |
 | Shift (held)   | Fine control: 10% thrust, slower rotation        |
 | 1–6            | Time warp presets ×0.25 / ×0.5 / ×1 / ×2 / ×4 / ×8 |
 | + / −          | Time warp ×1.25 / ÷1.25 (range ×0.1 – ×16)       |
 | P              | Pause                                            |
-| R / N          | New random level                                 |
+| R / N          | New random level (Enter also works after a game ends) |
 | M              | Switch mode (single planet ↔ planet + moon)      |
 | V              | Moon mode: toggle the whole-system view          |
 | H              | Toggle help                                      |
@@ -51,7 +51,7 @@ apoapsis.
 
 The game starts at ×0.5 time warp. Turning always happens in real time, but
 orbital motion and engine thrust follow the warp. Slow motion therefore also
-makes burns finer: at ×0.25 a tap on ↑ changes your speed 4× less.
+makes burns finer: at ×0.25 a tap on Space changes your speed 4× less.
 
 ## Planet + moon mode
 

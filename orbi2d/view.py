@@ -36,6 +36,7 @@ DIM_TEXT = QColor(140, 150, 170)
 FAINT = QColor(120, 130, 160, 90)
 
 MIN_VIEW_EXTENT = 380.0
+THRUST_KEYS = (Qt.Key.Key_Space, Qt.Key.Key_Up)
 MIN_MOON_VIEW_EXTENT = 110.0
 
 
@@ -46,6 +47,7 @@ class GameWidget(QWidget):
         self.setMinimumSize(640, 480)
         self.game = g.Game(seed=seed, mode=mode)
         self.controls = g.Controls()
+        self.thrust_keys: set[int] = set()  # held engine keys (Space, Up)
         self.paused = False
         self.show_help = True
         self.system_view = False   # moon mode: force the whole-system camera
@@ -104,8 +106,13 @@ class GameWidget(QWidget):
             self.controls.left = pressed
         elif key == Qt.Key.Key_Right:
             self.controls.right = pressed
-        elif key == Qt.Key.Key_Up:
-            self.controls.thrust = pressed
+        elif key in THRUST_KEYS:
+            # Either key fires the engine; it stays on while any is held.
+            if pressed:
+                self.thrust_keys.add(key)
+            else:
+                self.thrust_keys.discard(key)
+            self.controls.thrust = bool(self.thrust_keys)
         elif key == Qt.Key.Key_Shift:
             self.controls.fine = pressed
         else:
@@ -120,7 +127,7 @@ class GameWidget(QWidget):
         key = event.key()
         gm = self.game
         if key in (Qt.Key.Key_R, Qt.Key.Key_N) or (
-            key in (Qt.Key.Key_Space, Qt.Key.Key_Return, Qt.Key.Key_Enter)
+            key in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
             and gm.status != "playing"
         ):
             gm.reset()
@@ -161,6 +168,7 @@ class GameWidget(QWidget):
     def focusOutEvent(self, event) -> None:  # noqa: N802
         # Don't leave the engine stuck on when the window loses focus.
         self.controls = g.Controls()
+        self.thrust_keys.clear()
         super().focusOutEvent(event)
 
     # ---- coordinates -------------------------------------------------------
@@ -477,7 +485,7 @@ class GameWidget(QWidget):
 
         if self.show_help:
             help_lines = [
-                "←/→ rotate   ↑ main engine   Shift fine control",
+                "←/→ rotate   Space (or ↑) main engine   Shift fine control",
                 "1-6 or +/- time warp   P pause   R new orbit   M switch mode"
                 + ("   V system view" if moon_mode else ""),
                 "H hide help   Esc quit",
@@ -512,4 +520,4 @@ class GameWidget(QWidget):
         if sub:
             p.drawText(rect2, Qt.AlignmentFlag.AlignCenter, sub)
             rect2.translate(0, 22)
-        p.drawText(rect2, Qt.AlignmentFlag.AlignCenter, "Press Space / Enter for a new orbit")
+        p.drawText(rect2, Qt.AlignmentFlag.AlignCenter, "Press Enter for a new orbit")
