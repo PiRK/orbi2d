@@ -1,5 +1,7 @@
 # orbi2d
 
+![orbi2d: the rocket firing its engine on its current orbit (blue) around the planet, with the target orbit dashed in green](docs/screenshot.png)
+
 A 2D orbital-mechanics game in Python + Qt (PySide6). Your rocket starts on a
 random orbit around a planet. Put it on the dashed green target orbit, to
 within 2% (the largest radial gap between the two curves, relative to the
