@@ -15,6 +15,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Build scripts for a standalone Windows `.exe` (PyInstaller) and a Linux
   AppImage, an app icon, and a GitHub workflow that attaches both to each
   release.
+- Smoke test of both standalone builds in CI: the built `.exe` (on Windows)
+  and AppImage are launched with `ORBI2D_SMOKE_TEST=1`, run a short
+  Lunar Transfer session and must exit cleanly.
 
 ## [0.2.0] - 2026-11-20
 

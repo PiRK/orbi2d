@@ -65,6 +65,36 @@ jobs:
       - name: Build
         run: python ${{ matrix.script }}
 
+      # Run the built file: it opens, starts a Lunar Transfer game, returns
+      # to the menu and quits with exit code 0. A missing DLL or library
+      # shows an error dialog instead and never exits, hence the timeout.
+      - name: Smoke test (Windows .exe)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          ORBI2D_SMOKE_TEST: "1"
+        run: |
+          $exe = (Get-Item dist\*.exe).FullName
+          $p = Start-Process -FilePath $exe -PassThru
+          $null = $p.Handle  # keep the handle so ExitCode is available
+          if (-not $p.WaitForExit(120000)) {
+            Stop-Process -Id $p.Id -Force
+            throw "smoke test timed out (error dialog or hang)"
+          }
+          if ($p.ExitCode -ne 0) { throw "smoke test failed with exit code $($p.ExitCode)" }
+          Write-Host "smoke test passed"
+
+      - name: Smoke test (AppImage)
+        if: runner.os == 'Linux'
+        env:
+          ORBI2D_SMOKE_TEST: "1"
+          QT_QPA_PLATFORM: offscreen       # no display on the runner
+          APPIMAGE_EXTRACT_AND_RUN: "1"    # no FUSE on the runner
+        run: |
+          chmod +x dist/*.AppImage
+          timeout 120 dist/*.AppImage
+          echo "smoke test passed"
+
       - uses: actions/upload-artifact@v4
         with:
           name: orbi2d-${{ runner.os }}

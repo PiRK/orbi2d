@@ -1,13 +1,21 @@
 # SPDX-FileCopyrightText: 2026 PiRK
 # SPDX-License-Identifier: MIT
 
+import os
 import signal
 import sys
+import traceback
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
 
+from .game import MOON_MODE
 from .menu import MenuWidget
 from .view import GameWidget
+
+# Set to 1 to run a short self-test and exit (used by CI on the built .exe
+# and AppImage): exit code 0 if everything ran, 1 on any Python error.
+SMOKE_TEST_ENV = "ORBI2D_SMOKE_TEST"
 
 
 class MainWindow(QMainWindow):
@@ -46,7 +54,25 @@ def main() -> int:
     win = MainWindow()
     win.resize(1100, 850)
     win.show()
+    if os.environ.get(SMOKE_TEST_ENV) == "1":
+        smoke_test(app, win)
     return app.exec()
+
+
+def smoke_test(app: QApplication, win: MainWindow) -> None:
+    """Start a Lunar Transfer game, go back to the menu and quit.
+
+    PySide reports exceptions raised in Qt callbacks through sys.excepthook
+    and then keeps running, so the hook turns any error into exit code 1.
+    """
+    def fail(exc_type, exc, tb) -> None:
+        traceback.print_exception(exc_type, exc, tb)
+        app.exit(1)
+
+    sys.excepthook = fail
+    QTimer.singleShot(500, lambda: win.start_game(MOON_MODE))
+    QTimer.singleShot(1500, win.show_menu)
+    QTimer.singleShot(2000, lambda: app.exit(0))
 
 
 if __name__ == "__main__":
