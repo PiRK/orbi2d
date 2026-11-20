@@ -1,6 +1,6 @@
 # orbi2d
 
-![orbi2d: the rocket firing its engine on its current orbit (blue) around the planet, with the target orbit dashed in green](docs/screenshot.png)
+![orbi2d: the rocket firing its engine on its current orbit (blue) around the planet, with the target orbit dashed in green](https://raw.githubusercontent.com/PiRK/orbi2d/master/docs/screenshot.png)
 
 A 2D orbital-mechanics game in Python + Qt (PySide6). Your rocket starts on a
 random orbit around a planet. Put it on the dashed green target orbit, to
@@ -8,9 +8,14 @@ within 2% (the largest radial gap between the two curves, relative to the
 target).
 
 This started as a vibe-coding project. The first few prompts are documented
-for posterity in [claude_session.txt](claude_session.txt).
+for posterity in [claude_session.txt](https://github.com/PiRK/orbi2d/blob/master/claude_session.txt).
 
-## Run
+## Install and run
+
+    pip install orbi2d
+    orbi2d
+
+From a clone of this repository:
 
     pip install -r requirements.txt
     python -m orbi2d            # or: python -m orbi2d --seed 42
@@ -61,4 +66,4 @@ Tuning constants are at the top of `orbi2d/game.py`.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/PiRK/orbi2d/blob/master/LICENSE).

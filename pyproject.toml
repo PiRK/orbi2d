@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orbi2d"
+version = "0.1.0"
+description = "2D orbital mechanics game: steer a rocket onto a target orbit"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "PiRK" }]
+requires-python = ">=3.10"
+dependencies = ["PySide6>=6.5"]
+keywords = ["game", "orbital mechanics", "kepler", "physics", "qt"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Education",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment :: Simulation",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+[project.urls]
+Homepage = "https://github.com/PiRK/orbi2d"
+Source = "https://github.com/PiRK/orbi2d"
+Issues = "https://github.com/PiRK/orbi2d/issues"
+
+[project.gui-scripts]
+orbi2d = "orbi2d.__main__:main"
+
+[tool.setuptools]
+packages = ["orbi2d"]
