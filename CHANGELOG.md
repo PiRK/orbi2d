@@ -7,20 +7,22 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-### Changed
-- The README screenshot shows the start screen.
-- Lunar Transfer: back around the planet for a planet target, the camera
-  zooms in on the planet once the orbit can't reach the moon, instead of
-  always keeping the moon's whole orbit on screen.
+## [0.2.1] - 2026-11-20
 
 ### Added
-- This changelog.
-- Build scripts for a standalone Windows `.exe` (PyInstaller) and a Linux
-  AppImage, an app icon, and a GitHub workflow that attaches both to each
-  release.
+- Standalone builds that don't need Python: a Windows `.exe` (PyInstaller)
+  and a Linux AppImage, with an app icon. A GitHub workflow builds both and
+  attaches them to each release.
 - Smoke test of both standalone builds in CI: the built `.exe` (on Windows)
   and AppImage are launched with `ORBI2D_SMOKE_TEST=1`, run a short
   Lunar Transfer session and must exit cleanly.
+- This changelog.
+
+### Changed
+- Lunar Transfer: back around the planet for a planet target, the camera
+  zooms in on the planet once the orbit can't reach the moon, instead of
+  always keeping the moon's whole orbit on screen.
+- The README screenshot shows the start screen.
 
 ## [0.2.0] - 2026-11-20
 
@@ -62,6 +64,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   the game starts at ×0.5.
 - MIT license.
 
-[Unreleased]: https://github.com/PiRK/orbi2d/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/PiRK/orbi2d/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/PiRK/orbi2d/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PiRK/orbi2d/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/PiRK/orbi2d/releases/tag/v0.1.0
