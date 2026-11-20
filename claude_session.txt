@@ -1,4 +1,4 @@
->  gm. This project is a blank slate, I want to make it a 2D game with  a planet in the center of the screen, a rocket on some random orbit, another random orbit drawn on screen is the target orbit. The player need to bring the rocket into the target orbit (within a tiny tolerance margin) to win. The rocket has unlimited fuel, two side thruster that control it's orientation (activated by the left and right arrows on the keyboard), and one main thruster in the back to accelerate (activated by the Up arrow on the keyboard).The side thrusters only affect the ships orientation, we neglect their effect on the orbital trajectory. To decelerate, the player needs to rotate the ship to point the main thruster in the direction opposite to the motion. The current ships orbit needs to be drawn on screen and adjusted everytime the main thruster is fired. Orbital mechanics apply to any action on the main thruster (accelerating  at any of the two apsides moves the other apside away from the planet, decelerating at an apside moves the other apside closer to the planet, any other thrust action in any other random point of the orbit in any random direction needs to be properly modelled wrt to its effect on the orbit). Let's do this project in python + qt.
+>  gm. This project is a blank slate, I want to make it a 2D game with a planet in the center of the screen, a rocket on some random orbit, another random orbit drawn on screen is the target orbit. The player needs to bring the rocket into the target orbit (within a tiny tolerance margin) to win. The rocket has unlimited fuel, two side thrusters that control its orientation (activated by the left and right arrows on the keyboard), and one main thruster in the back to accelerate (activated by the Up arrow on the keyboard). The side thrusters only affect the ship's orientation, we neglect their effect on the orbital trajectory. To decelerate, the player needs to rotate the ship to point the main thruster in the direction opposite to the motion. The current ship's orbit needs to be drawn on screen and adjusted every time the main thruster is fired. Orbital mechanics apply to any action on the main thruster (accelerating at either of the two apsides moves the other apside away from the planet, decelerating at an apside moves the other apside closer to the planet, any other thrust action at any other random point of the orbit in any random direction needs to be properly modelled with respect to its effect on the orbit). Let's do this project in Python + Qt.
 
 
 The game is built and runs. To play it:
@@ -83,7 +83,7 @@ Pressing + then − doesn't always land exactly where you started, because the v
 
 The changes are in orbi2d/game.py, orbi2d/view.py, README.md and tests/test_physics.py.
 
-❯ guide me through uploading the repo to github
+❯ guide me through uploading the repo to GitHub
 
 You're already set up for this. The GitHub CLI (gh) is installed and logged in as PiRK, git is set to use SSH, and you have an SSH key. The repo doesn't have a GitHub remote yet, so it only takes one command.
 
@@ -121,3 +121,283 @@ The step 2 command stays the same. When it pushes, master will be the only branc
 gh repo view --json defaultBranchRef -q .defaultBranchRef.name   # → master
 
 If you want new repos on this machine to start with master as well, run git config --global init.defaultBranch master.
+
+❯ One more step before I'm happy: make a screenshot of the game and add it to the top of the README.
+
+Seed 11 gives the clearest picture: both orbits are easy to tell apart and the ship is firing with nothing overlapping it.
+
+I added a screenshot to the top of the README, just under the title.
+- The image is docs/screenshot.png (1100×850, 82 KB). I rendered it offscreen from the real game: level seed 11, about a second in, with the main engine firing. It shows the HUD, both orbits with their Pe/Ap markers, the engine flame, and the yellow prograde and red ✕ retrograde markers.
+- The README now has this line under the title. The relative path works on GitHub, and the alt text describes the image for screen readers:
+  ![orbi2d: the rocket firing its engine on its current orbit (blue) around the planet, with the target orbit dashed in green](docs/screenshot.png)
+
+❯ how do I record (screencast) a game session?
+
+You're on GNOME with Wayland. That rules out ffmpeg -f x11grab and SimpleScreenRecorder (they only work on X11), but there are two good options already on your machine.
+
+1. GNOME's built-in recorder (easiest)
+   Start the game, press Ctrl+Shift+Alt+R, choose Window, click the game window, then click the record button. The video is saved as a .webm file in ~/Videos/Screencasts/.
+
+2. OBS Studio (more control; already installed)
+   Add a "Screen Capture (PipeWire)" source, pick the game window, set the output format to mp4 and 60 FPS, then Start/Stop Recording.
+
+Converting and trimming with ffmpeg:
+
+ffmpeg -i in.webm -c:v libx264 -crf 20 -pix_fmt yuv420p out.mp4
+ffmpeg -ss 5 -t 12 -i in.webm -c:v libx264 -crf 20 -pix_fmt yuv420p clip.mp4
+ffmpeg -ss 5 -t 12 -i in.webm -vf "fps=20,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse" demo.gif
+
+On GitHub, a committed GIF plays automatically in the README. An MP4 committed to the repo only shows as a link; drag it into an issue or comment box to get a user-attachments URL that embeds as a video player.
+
+I could also build recording into the game: a key that saves every frame straight from Qt and runs them through ffmpeg.
+
+❯ could you play a game session and record it? Without being too perfect at it (don't win in a single thrust)? Aim for a 10-20 s clip.
+
+I'll write a small autopilot that plays like a person would. It speeds up time while coasting, burns at full power with a slightly wrong aim and cuts out early, then makes a few fine Shift burns in slow motion to correct. The real game widget renders every frame offscreen, and ffmpeg encodes them.
+
+(... dry runs over several levels, tuning the autopilot's correction burns and time warp ...)
+
+The game session is recorded as a 17-second MP4 (1100×850, 30 fps, H.264, about 540 KB).
+
+The run takes 9.7 s of game time, then stays on the win screen for 2.5 s:
+
+┌────────────┬──────────────────────────────────────────────────────────────────┐
+│ Video time │ What happens                                                     │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ 0–4 s      │ The ship turns toward the burn direction and time speeds up      │
+│            │ while it coasts to where the two orbits cross.                   │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ ~4 s       │ One full-power burn, aimed about 7° off and cut out early at     │
+│            │ 85%. That leaves the orbit 5.6% off target.                      │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ 4–14 s     │ Time drops to ×0.5 and then ×0.25. Three short fine (Shift)      │
+│            │ burns bring the error down from 4.6% to 3.6% and then 2.9%.      │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ ~14.5 s    │ The deviation reaches 1.99%, the engine is off, and the game     │
+│            │ shows ORBIT ACHIEVED (Δv 39.0 used).                             │
+└────────────┴──────────────────────────────────────────────────────────────────┘
+
+The autopilot plays with the same keys and rules as you. The mistakes are deliberate (bad aim, cutting out early), and it corrects by trial and error, not with an exact calculation.
+
+❯ Now I want the game to have two modes: the current single-planet mode unchanged, and a new planet + moon mode in which the start orbit is on one celestial body and the target orbit is on the other celestial body.
+
+This mode needs a few design decisions. I'll take the defaults below and list them at the end so you can change any of them.
+- Physics: patched conics, the same approach Kerbal Space Program uses. Only one body pulls on the rocket at a time. The moon has a sphere of influence (SOI): inside it the rocket orbits the moon, and outside it the rocket orbits the planet. Each stretch of flight therefore stays an exact conic, so the drawn orbit stays accurate.
+- The moon moves, on a circular orbit around the planet, so a transfer has to be timed.
+- Encounter prediction: a moon transfer is nearly impossible to aim without one. The game will show where the rocket enters or leaves the moon's SOI and the orbit it will have afterwards.
+
+Before I change anything, I'll record a reference run of the single-planet mode, so I can check afterwards that it's unchanged rather than assume it.
+
+(... game logic rewritten; the single-planet mode gives bit-for-bit identical results to the reference run; the predicted SOI crossing matches the simulation to within 0.01 s ...)
+
+❯ yes, continue
+
+(... view rewritten: moon, SOI, prediction drawing, camera, HUD, M and V keys; screenshots checked; 10 new tests ...)
+
+The planet + moon mode is built, and the single-planet mode is unchanged.
+
+How the moon mode works
+- The moon circles the planet once every 75 s at ×1 time warp. A dotted circle around it shows its sphere of influence (SOI).
+- Levels start you around either the planet or the moon, chosen at random, and put the target orbit around the other one.
+- Physics: when the rocket crosses the SOI edge, its position and velocity are converted to the other body's frame. Every stretch of flight is still an exact orbit.
+- Prediction (purple): when your path will cross the SOI, the game shows the crossing point, where the moon will be at that moment, and your orbit after the crossing. The top-right corner shows "MOON ENCOUNTER in 12.3s" or "LEAVING MOON SOI in …".
+- Camera: it zooms in on the moon while you orbit it, and switches to the whole system otherwise. V toggles the whole-system view by hand.
+
+How I checked it
+- Single mode: a fixed run of inputs over 4 levels gives bit-for-bit identical results before and after the change.
+- Tests: 10 new moon-mode tests (level setup, the moon's motion, frame switching, prediction vs simulation, winning and crashing at the moon, stable moon orbits). All 26 tests pass.
+- Playability: a scripted pilot flew from the planet to a stable orbit around the moon using only the game's controls, in 46 s of game time and 38 units of Δv.
+
+❯ let's stash for an instant and deal with registering the PyPI project first
+
+Your moon-mode work is safely stashed, and the working tree is clean. The name orbi2d is free on PyPI.
+
+On PyPI, a project is "registered" by its first upload; there's no separate sign-up step for the name. So first the project needs packaging metadata.
+
+(... pyproject.toml added; README links made absolute; package built, checked with twine check and test-installed in a clean virtual environment ...)
+
+Changes waiting to be committed
+- pyproject.toml (new): name orbi2d, version 0.1.0, MIT license, Python ≥ 3.10, requires PySide6 ≥ 6.5, plus the project links. It installs an orbi2d command.
+- README.md: the screenshot and the two links now use full GitHub URLs, so they also work on PyPI's project page. There's also a new "Install and run" section.
+- .gitignore: now ignores the build folders.
+
+Registering the name needs your PyPI account (with two-factor authentication). Two ways:
+A. Upload with an API token (registers the name now): create a token scoped to "Entire account", then run python3 -m twine upload dist/* yourself, so the token stays out of this chat.
+B. Trusted publishing from GitHub (no tokens): add a "pending publisher" on PyPI and a GitHub workflow that uploads on each release.
+
+I recommend doing A now to secure the name, and setting up B later.
+
+❯ tag it v0.1.0 and push
+
+I tagged the packaging commit as v0.1.0 and pushed both master and the tag to GitHub.
+
+❯ create my .pypirc skeleton file for this project. I'll add the token manually
+
+I created the skeleton at ~/.pypirc, outside the repo, so it can't be committed by accident. Only your user can read it (permissions -rw-------).
+
+[pypi]
+username = __token__
+password = pypi-AgEIcHlwaS5vcmc...
+
+The file also has a [testpypi] section for TestPyPI, the separate practice server.
+
+❯ does that work with a project-specific token? It looks like the file is set up for an Entire Account token?
+
+Yes, the file works the same with a project-scoped token. PyPI enforces the scope on its side when you upload. To twine, every token looks the same: the username is always __token__ and the password is the token.
+- First upload: you can't create an orbi2d-scoped token until the orbi2d project exists on PyPI, so the very first upload needs an account-wide token.
+- Every upload after that: swap in an orbi2d-scoped token. Nothing else in the file changes.
+
+If you later publish other projects with their own tokens, add one section per project pointing at the same upload server, and upload with python3 -m twine upload -r orbi2d dist/*.
+
+❯ add the [orbi2d] section
+
+Your token may already be in ~/.pypirc, so I'll edit the file with a script that never prints the passwords.
+
+I added an [orbi2d] section to ~/.pypirc and listed it under index-servers. Its password = line is empty for you to fill in.
+
+❯ ok, I put the same token for both pypi and orbi2d for now, but at least I'm ready to manage multiple PyPI projects
+
+That setup works. With the same account-wide token in both sections, -r orbi2d and the default [pypi] section both upload fine. Once orbi2d 0.1.0 is on PyPI, create a token scoped to orbi2d, paste it into [orbi2d], and delete the account-wide token.
+
+❯ test the PyPI page
+
+orbi2d 0.1.0 is live on PyPI and installs correctly. One thing needs fixing: PyPI didn't record the license.
+- Install: in a fresh environment, pip install orbi2d==0.1.0 pulls in PySide6, and the orbi2d command starts the game.
+- Files: the wheel and source archive on PyPI are byte-for-byte the files built from the v0.1.0 commit.
+- README: every URL in it works, including the screenshot.
+
+pypi.org shows its HTML page to scripts as a bot check, so I couldn't see the rendered page itself.
+
+The license problem: the package does contain License-Expression: MIT, but your twine (5.0.0) is too old to read this newer metadata format (2.4), so it didn't pass the license to PyPI. Twine 6.1 and later handle it. PyPI never lets you re-upload a version, so the fix will show up with the next release.
+
+❯ back to coding, bring back the stashed changes and remind me what the next step/decision is
+
+The moon-mode work is restored with no conflicts, and all 26 tests pass. The README merge kept both edits.
+
+Next step: test-play the moon mode, then decide which of these to change before committing:
+1. Moon settings: distance 600, mass 5% of the planet's, radius 18.
+2. Your orbit around the planet is still drawn as a full ellipse even when it will enter the moon's sphere of influence.
+3. The help line now wraps onto a third line in single mode too.
+
+Then: commit and push the moon mode, and for PyPI bump the version to 0.2.0, upgrade twine so PyPI records the license, tag v0.2.0, build and upload.
+
+❯ I would like the space bar to be the main thrust button. We can keep the up arrow as the alternative/legacy binding as well.
+
+Space currently starts a new level once a game has ended. If it also fires the engine, a player who taps Space just after winning would skip straight past the win screen. So I'll make Space only the engine key, and keep Enter (and R/N) for "new level".
+
+Space now fires the main engine, and ↑ still works as an alternative.
+- The engine stays on while either key is held; it stops only when both are released.
+- Space no longer starts a new level after a game ends. Enter does that now, as do R and N at any time.
+- Switching to another window still releases all keys, so the engine can't get stuck on.
+
+❯ ctrl+c in the terminal seems to be caught. Is that a design decision or a bug?
+
+It's a bug, not a design decision. I didn't set up any Ctrl+C handling, and this is what Python + Qt do by default.
+1. Ctrl+C sends SIGINT. Python's default handler raises KeyboardInterrupt the next time Python code runs.
+2. While the game runs, control sits in Qt's event loop (C++). Python code only runs during callbacks, here the 60 fps timer that calls _tick.
+3. So the KeyboardInterrupt is raised inside _tick. PySide catches it, prints the traceback, and lets the event loop carry on.
+
+Fix: after creating the QApplication, add
+signal.signal(signal.SIGINT, lambda *_: app.quit())
+Ctrl+C would then close the window and exit cleanly.
+
+❯ yes, add the app.quit() version
+
+Ctrl+C now quits the game cleanly. To test it, I started the game, sent it SIGINT after 2 seconds, and it exited at once with code 0 and no traceback.
+
+❯ let's improve the game mode selection. No more command line options, a selection screen at startup, and a way to exit a current game to return to the selection screen. The selection screen should have three options (feel free to reword): "planetary orbit", "lunar orbit insertion", "quit". Make that main screen look nice, with graphics similar to the game itself, with a moon slowly orbiting the planet
+
+I'll build this inside the existing game window, as a menu screen with the game behind it. I'm renaming "lunar orbit insertion" to "Lunar Transfer" because the mode also includes moon → planet trips.
+
+(... shared drawing code moved to graphics.py, with game renders pixel-identical before and after; menu.py and a stacked main window added; the whole flow driven with real key presses and mouse clicks ...)
+
+The game now opens on a start screen, and Esc returns you to it from a game.
+- The title is orbi2d, with "2d" in the game's blue, over a subtitle line.
+- The three options are Planetary Orbit, Lunar Transfer and Quit, each with a one-line description, controlled with ↑/↓ and Enter, the number keys, or the mouse.
+- The scene on the right uses the game's own drawing: the moon goes round the planet once a minute with a dashed green target orbit, and a ship flies its own elliptical orbit using the game's orbit physics.
+- Esc in a game goes back to the start screen. The M key, the Q key and both command-line options are removed.
+
+❯ ok commit and let's release
+
+Releasing 0.2.0: commit the start screen, bump the version, check twine, build and check the package, tag and push, upload.
+
+orbi2d 0.2.0 is released on GitHub and PyPI.
+- PyPI: https://pypi.org/project/orbi2d/0.2.0/ - both files match the local build, and the license now shows as MIT.
+- Before uploading, I installed the built package in a clean environment and the game started.
+- A background check later confirmed that pip install orbi2d==0.2.0 works from PyPI.
+
+❯ Yes replace the screenshot and create the GitHub release
+
+docs/screenshot.png now shows the start screen. GitHub release "orbi2d 0.2.0" is published from tag v0.2.0, marked as latest, with release notes and the wheel and source archive attached.
+
+❯ yes create the 1.0 release as well, then add a file with release notes and commit+push it
+
+I made both, reading "the 1.0 release" as the 0.1.0 release I'd offered rather than a new version 1.0.
+- GitHub release 0.1.0: created from the existing v0.1.0 tag, with the PyPI files attached (checked byte for byte), not marked as latest.
+- CHANGELOG.md: "Keep a Changelog" layout, with entries for 0.1.0 and 0.2.0 plus an "Unreleased" section.
+
+❯ Now do a screencast video of a Lunar Transfer game. Start at the main screen.
+
+I'll extend the earlier autopilot approach to a full lunar mission: start on the menu and select Lunar Transfer with real key presses, wait at high time warp for the right departure moment (a simulated test burn checks each candidate), coast to the moon, burn retrograde at the closest point to be captured, then trim onto the target orbit.
+
+(... dry runs; two trimming bugs fixed: too-coarse test nudges, and a periapsis trimmed into the moon ...)
+
+The screencast is 34 s long, 1100×850 at 30 fps, and 1.6 MB.
+
+┌────────────┬──────────────────────────────────────────────────────────────────┐
+│ Video time │ What happens                                                     │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ 0–3 s      │ Start screen; the selection moves to Lunar Transfer and Enter    │
+│            │ starts it (real key presses).                                    │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ 3–7 s      │ The ship turns prograde and waits at ×8 for the moon to be in    │
+│            │ the right position.                                              │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ 7–9 s      │ Departure burn; the purple prediction shows the moon encounter.  │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ 9–13 s     │ Coast to the moon at up to ×16.                                  │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ 13–19 s    │ Flyby into the moon's SOI, then a retrograde burn at the closest │
+│            │ point; the ship is captured and the camera zooms on the moon.    │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ 19–31 s    │ Trimming burns in slow motion: deviation 19% → 6% → 1.99%.       │
+├────────────┼──────────────────────────────────────────────────────────────────┤
+│ 31–34 s    │ ORBIT ACHIEVED: Δv 32.6, game time 57.4 s.                       │
+└────────────┴──────────────────────────────────────────────────────────────────┘
+
+❯ Now add a couple of scripts to release a .exe (for Windows) and an AppImage (for Linux). Not sure what the simplest solutions are these days... maybe PyInstaller?
+
+Here's the current state of the art, briefly:
+- Windows .exe: PyInstaller is still the simplest and most widely used tool, and it supports PySide6 out of the box. It can't cross-compile, so a Windows .exe has to be built on Windows.
+- AppImage: the usual recipe is to bundle the app with PyInstaller, wrap the result in an "AppDir" (launcher script, .desktop file, icon), and pack it with appimagetool. An AppImage only runs on Linux systems at least as new as the one it was built on, so release builds should come from an older distro.
+
+Since you're on Linux, I'll write both build scripts plus a GitHub Actions workflow that builds the .exe on a Windows runner and the AppImage on Ubuntu 22.04, and attaches both to each GitHub release.
+
+(... app icon drawn with the game's own graphics; appimagetool pinned to release 1.9.1 with its SHA-256 checked against GitHub's published digest; the local test build was blocked by the permission system ...)
+
+- packaging/build_exe.py: builds a single-file windowed .exe with PyInstaller (refuses to run outside Windows).
+- packaging/build_appimage.py: PyInstaller bundle → AppDir → appimagetool.
+- packaging/make_icon.py, orbi2d.png, orbi2d.ico, orbi2d.desktop, launcher.py, requirements.txt.
+- .github/workflows/standalone-builds.yml: runs when a GitHub release is published, or by hand for an existing tag.
+
+❯ commit and push, I'll run the workflow
+
+Before you run it, I found a problem in what I just pushed: with release_tag v0.2.0, the workflow would check out the v0.2.0 tag, which predates the packaging/ scripts. Manual runs now build from the branch you pick and only use release_tag to choose which release gets the files. The game code on master is identical to v0.2.0.
+
+❯ DONE
+
+Both jobs succeeded in 2m44s, and the release now has the files attached: orbi2d-0.2.0-windows-x64.exe (49 MB) and orbi2d-0.2.0-x86_64.AppImage (75 MB).
+- The build logs are clean.
+- I downloaded the AppImage from the release; it started and kept running with no errors, and it includes the X11 and Wayland display plugins and libxcb-cursor.
+- The Windows .exe is still unverified: it needs a real Windows machine.
+
+❯ the appimage works. The windows one I haven't properly tested yet, but when running with wine on my Ubuntu it fails with "DLL load failure while importing QtWidgets: module not found"
+
+The first missing piece is icuuc.dll, which Qt6Core.dll needs. Every other error follows from that one: without Qt6Core, the PySide6 glue library can't load, then QtGui can't, then QtWidgets can't.
+
+This is almost certainly a Wine limitation, not a packaging bug:
+- icuuc.dll is the ICU Unicode library. On Windows 10 (1703 and later) and Windows 11 it ships as a system file in C:\Windows\System32.
+- Recent Qt 6 versions for Windows use the copy Windows provides, and PyInstaller correctly leaves Windows system DLLs out of the bundle.
+- Wine 9.0 doesn't provide icuuc.dll, so under Wine the chain breaks at the first link.
+
+To settle it, the most reliable option is a smoke test on GitHub's Windows runner: launch the freshly built .exe with a hidden switch that makes it quit after 2 seconds, and fail the job unless it exits cleanly.
