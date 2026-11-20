@@ -6,11 +6,10 @@ A 2D orbital-mechanics game in Python + Qt (PySide6). Your rocket starts on a
 random orbit. Put it on the dashed green target orbit, to within 2% (the
 largest radial gap between the two curves, relative to the target).
 
-There are two modes:
+Pick a mode on the start screen:
 
-- **Single planet** (default): start and target orbits are both around the
-  planet.
-- **Planet + moon**: a moon circles the planet. You start around one of them
+- **Planetary Orbit**: start and target orbits are both around the planet.
+- **Lunar Transfer**: a moon circles the planet. You start around one of them
   and the target orbit is around the other, so you have to fly from the
   planet to the moon or from the moon back to the planet.
 
@@ -25,9 +24,10 @@ for posterity in [claude_session.txt](https://github.com/PiRK/orbi2d/blob/master
 From a clone of this repository:
 
     pip install -r requirements.txt
-    python -m orbi2d                # single-planet mode
-    python -m orbi2d --mode moon    # planet + moon mode
-    python -m orbi2d --seed 42      # replay a given level (works with both modes)
+    python -m orbi2d
+
+The game opens on the start screen: choose a mode with ↑/↓ and Enter, or
+with the mouse.
 
 ## Controls
 
@@ -40,10 +40,9 @@ From a clone of this repository:
 | + / −          | Time warp ×1.25 / ÷1.25 (range ×0.1 – ×16)       |
 | P              | Pause                                            |
 | R / N          | New random level (Enter also works after a game ends) |
-| M              | Switch mode (single planet ↔ planet + moon)      |
-| V              | Moon mode: toggle the whole-system view          |
+| V              | Lunar Transfer: toggle the whole-system view     |
 | H              | Toggle help                                      |
-| Esc / Q        | Quit                                             |
+| Esc            | Back to the start screen (Esc there quits)       |
 
 The yellow circle next to the ship marks the **prograde** direction (where the
 ship is moving). The red ✕ marks **retrograde**. Pe/Ap mark periapsis and
@@ -53,7 +52,7 @@ The game starts at ×0.5 time warp. Turning always happens in real time, but
 orbital motion and engine thrust follow the warp. Slow motion therefore also
 makes burns finer: at ×0.25 a tap on Space changes your speed 4× less.
 
-## Planet + moon mode
+## Lunar Transfer mode
 
 - The moon moves on a circular orbit, so you have to time your departure: a
   transfer only works if the moon is there when you arrive.
@@ -84,7 +83,7 @@ makes burns finer: at ×0.25 a tap on Space changes your speed 4× less.
   So a burn in any direction at any point of the orbit changes the orbit the
   way it would in reality. For example, a prograde burn at one apsis raises the
   other apsis, and a radial burn rotates the line of apsides.
-- In planet + moon mode the game uses *patched conics*: each body has a
+- In Lunar Transfer mode the game uses *patched conics*: each body has a
   sphere of influence, `r_SOI = d · (m_moon / m_planet)^0.4`. When the rocket
   crosses its edge, the position and velocity are converted to the other
   body's frame and the rocket continues on an exact conic around that body.

@@ -1,14 +1,13 @@
 # SPDX-FileCopyrightText: 2026 PiRK
 # SPDX-License-Identifier: MIT
 
-"""Qt rendering and input handling."""
+"""The game screen: rendering and input handling."""
 
 from __future__ import annotations
 
 import math
-import random
 
-from PySide6.QtCore import QElapsedTimer, QPointF, QRectF, Qt, QTimer
+from PySide6.QtCore import QElapsedTimer, QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -18,22 +17,27 @@ from PySide6.QtGui import (
     QPainterPath,
     QPen,
     QPolygonF,
-    QRadialGradient,
 )
 from PySide6.QtWidgets import QWidget
 
 from . import game as g
+from .graphics import (
+    BAD_COLOR,
+    BG,
+    CURRENT_COLOR,
+    DIM_TEXT,
+    FAINT,
+    PREDICT_COLOR,
+    TARGET_COLOR,
+    TEXT_COLOR,
+    WARN_COLOR,
+    draw_moon,
+    draw_planet,
+    draw_ship,
+    draw_stars,
+    make_stars,
+)
 from .physics import Orbit, Vec
-
-BG = QColor(6, 8, 18)
-CURRENT_COLOR = QColor(80, 190, 255)
-TARGET_COLOR = QColor(110, 255, 140)
-PREDICT_COLOR = QColor(215, 140, 255)
-WARN_COLOR = QColor(255, 200, 80)
-BAD_COLOR = QColor(255, 90, 90)
-TEXT_COLOR = QColor(220, 225, 235)
-DIM_TEXT = QColor(140, 150, 170)
-FAINT = QColor(120, 130, 160, 90)
 
 MIN_VIEW_EXTENT = 380.0
 THRUST_KEYS = (Qt.Key.Key_Space, Qt.Key.Key_Up)
@@ -41,28 +45,42 @@ MIN_MOON_VIEW_EXTENT = 110.0
 
 
 class GameWidget(QWidget):
+    exit_requested = Signal()  # Esc: back to the main menu
+
     def __init__(self, seed: int | None = None, mode: str = g.SINGLE) -> None:
         super().__init__()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMinimumSize(640, 480)
+        self.show_help = True
+        self.stars = make_stars()
+        self.clock = QElapsedTimer()
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._tick)
+        self.start_game(mode, seed)
+
+    def start_game(self, mode: str, seed: int | None = None) -> None:
+        """Start a new level in ``mode``, keeping the player's time warp."""
+        warp = self.game.time_warp if hasattr(self, "game") else g.DEFAULT_WARP
         self.game = g.Game(seed=seed, mode=mode)
+        self.game.set_warp(warp)
         self.controls = g.Controls()
         self.thrust_keys: set[int] = set()  # held engine keys (Space, Up)
         self.paused = False
-        self.show_help = True
         self.system_view = False   # moon mode: force the whole-system camera
         # Camera: ``focus`` blends the view centre from the planet (0) to the
         # moon (1); ``view_extent`` is the half-size of the view in world units.
         self.focus, self.view_extent = self._desired_view()
+        self.clock.restart()
 
-        rng = random.Random(1234)
-        self.stars = [(rng.random(), rng.random(), rng.uniform(0.3, 1.0)) for _ in range(220)]
-
-        self.clock = QElapsedTimer()
-        self.clock.start()
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self._tick)
+    # Only animate while visible (the menu and the game share one window).
+    def showEvent(self, event) -> None:  # noqa: N802
+        self.clock.restart()
         self.timer.start(16)
+        super().showEvent(event)
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self.timer.stop()
+        super().hideEvent(event)
 
     # ---- loop ------------------------------------------------------------
     def _tick(self) -> None:
@@ -132,8 +150,6 @@ class GameWidget(QWidget):
         ):
             gm.reset()
             self.paused = False
-        elif key == Qt.Key.Key_M:
-            self.switch_mode()
         elif key == Qt.Key.Key_V:
             self.system_view = not self.system_view
         elif key == Qt.Key.Key_P:
@@ -146,18 +162,12 @@ class GameWidget(QWidget):
             gm.faster()
         elif key in (Qt.Key.Key_Minus, Qt.Key.Key_Underscore):
             gm.slower()
-        elif key in (Qt.Key.Key_Escape, Qt.Key.Key_Q):
-            self.window().close()
+        elif key == Qt.Key.Key_Escape:
+            self.controls = g.Controls()
+            self.thrust_keys.clear()
+            self.exit_requested.emit()
         else:
             super().keyPressEvent(event)
-
-    def switch_mode(self) -> None:
-        old = self.game
-        mode = g.MOON_MODE if old.mode == g.SINGLE else g.SINGLE
-        self.game = g.Game(mode=mode)
-        self.game.set_warp(old.time_warp)
-        self.paused = False
-        self.focus, self.view_extent = self._desired_view()
 
     def keyReleaseEvent(self, event: QKeyEvent) -> None:  # noqa: N802
         if event.isAutoRepeat():
@@ -194,7 +204,7 @@ class GameWidget(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.fillRect(self.rect(), BG)
-        self._draw_stars(p)
+        draw_stars(p, self.stars, self.width(), self.height())
 
         gm = self.game
         moon = gm.moon
@@ -226,40 +236,11 @@ class GameWidget(QWidget):
         self._draw_banner(p)
         p.end()
 
-    def _draw_stars(self, p: QPainter) -> None:
-        w, h = self.width(), self.height()
-        for sx, sy, b in self.stars:
-            c = int(90 + 120 * b)
-            p.setPen(QColor(c, c, c + 20 if c < 235 else 255))
-            p.drawPoint(QPointF(sx * w, sy * h))
-
     def _draw_planet(self, p: QPainter) -> None:
-        c = self.to_screen(0, 0)
-        r = self.game.planet_radius * self.scale
-        grad = QRadialGradient(c + QPointF(-0.35 * r, -0.35 * r), 1.3 * r)
-        grad.setColorAt(0.0, QColor(120, 170, 255))
-        grad.setColorAt(0.6, QColor(40, 90, 190))
-        grad.setColorAt(1.0, QColor(10, 25, 70))
-        # Thin atmosphere glow.
-        glow = QRadialGradient(c, r * 1.25)
-        glow.setColorAt(0.75, QColor(100, 160, 255, 90))
-        glow.setColorAt(1.0, QColor(100, 160, 255, 0))
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(glow))
-        p.drawEllipse(c, r * 1.25, r * 1.25)
-        p.setBrush(QBrush(grad))
-        p.drawEllipse(c, r, r)
+        draw_planet(p, self.to_screen(0, 0), self.game.planet_radius * self.scale)
 
     def _draw_moon(self, p: QPainter, pos: Vec) -> None:
-        c = self.to_screen(*pos)
-        r = self.game.moon.radius * self.scale
-        grad = QRadialGradient(c + QPointF(-0.35 * r, -0.35 * r), 1.3 * r)
-        grad.setColorAt(0.0, QColor(225, 222, 210))
-        grad.setColorAt(0.6, QColor(150, 146, 138))
-        grad.setColorAt(1.0, QColor(55, 54, 52))
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(grad))
-        p.drawEllipse(c, r, r)
+        draw_moon(p, self.to_screen(*pos), self.game.moon.radius * self.scale)
 
     def _draw_moon_path(self, p: QPainter) -> None:
         """Moon's orbit around the planet and its sphere of influence."""
@@ -347,12 +328,10 @@ class GameWidget(QWidget):
     def _draw_rocket(self, p: QPainter) -> None:
         gm = self.game
         pos = self.to_screen(*gm.world_r)
-        # Screen y is flipped, so negate the angle for Qt's rotation.
         p.save()
         p.translate(pos)
-
         # Prograde / retrograde markers (velocity relative to the body being
-        # orbited) around the ship.
+        # orbited) around the ship.  Screen y is flipped, hence the minus.
         vx, vy = gm.v
         vang = -math.atan2(vy, vx)
         ring = 26.0
@@ -365,40 +344,9 @@ class GameWidget(QWidget):
         p.setPen(QPen(QColor(230, 120, 100), 1.4))
         p.drawLine(retro + QPointF(-3.5, -3.5), retro + QPointF(3.5, 3.5))
         p.drawLine(retro + QPointF(-3.5, 3.5), retro + QPointF(3.5, -3.5))
-
-        p.rotate(-math.degrees(gm.heading))
-        p.scale(1.4, 1.4)
-        # Ship body pointing along +x.
-        body = QPolygonF([
-            QPointF(13, 0), QPointF(4, -5), QPointF(-9, -5),
-            QPointF(-9, 5), QPointF(4, 5),
-        ])
-        if gm.thrusting:
-            flame_len = (10 + 8 * random.random()) * (0.5 if self.controls.fine else 1.0)
-            flame = QPolygonF([QPointF(-9, -3.5), QPointF(-9 - flame_len, 0), QPointF(-9, 3.5)])
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(255, 160, 40))
-            p.drawPolygon(flame)
-            p.setBrush(QColor(255, 240, 160))
-            p.drawPolygon(QPolygonF([QPointF(-9, -2), QPointF(-9 - flame_len * 0.5, 0), QPointF(-9, 2)]))
-        if gm.rotating:
-            # Side thrusters at the nose: firing left side pushes nose right.
-            side = 1 if gm.rotating > 0 else -1  # +1 = ccw (nose turns up/left)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(200, 220, 255))
-            y0 = 5 * side
-            p.drawPolygon(QPolygonF([
-                QPointF(6, y0), QPointF(8, y0 + 6 * side), QPointF(4, y0 + 6 * side),
-            ]))
-            p.drawPolygon(QPolygonF([
-                QPointF(-6, -y0), QPointF(-4, -y0 - 6 * side), QPointF(-8, -y0 - 6 * side),
-            ]))
-        p.setPen(QPen(QColor(30, 30, 40), 1))
-        p.setBrush(QColor(235, 235, 245))
-        p.drawPolygon(body)
-        p.setBrush(QColor(200, 60, 60))
-        p.drawPolygon(QPolygonF([QPointF(13, 0), QPointF(4, -5), QPointF(4, 5)]))
         p.restore()
+        thrust = ("fine" if self.controls.fine else "full") if gm.thrusting else None
+        draw_ship(p, pos, gm.heading, thrust=thrust, rotating=gm.rotating)
 
     def _draw_hud(self, p: QPainter) -> None:
         gm = self.game
@@ -486,9 +434,9 @@ class GameWidget(QWidget):
         if self.show_help:
             help_lines = [
                 "←/→ rotate   Space (or ↑) main engine   Shift fine control",
-                "1-6 or +/- time warp   P pause   R new orbit   M switch mode"
+                "1-6 or +/- time warp   P pause   R new orbit"
                 + ("   V system view" if moon_mode else ""),
-                "H hide help   Esc quit",
+                "H hide help   Esc main menu",
             ]
             p.setFont(QFont("monospace", 9))
             p.setPen(DIM_TEXT)
@@ -520,4 +468,4 @@ class GameWidget(QWidget):
         if sub:
             p.drawText(rect2, Qt.AlignmentFlag.AlignCenter, sub)
             rect2.translate(0, 22)
-        p.drawText(rect2, Qt.AlignmentFlag.AlignCenter, "Press Enter for a new orbit")
+        p.drawText(rect2, Qt.AlignmentFlag.AlignCenter, "Enter: new orbit     Esc: main menu")

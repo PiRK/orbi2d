@@ -1,37 +1,51 @@
 # SPDX-FileCopyrightText: 2026 PiRK
 # SPDX-License-Identifier: MIT
 
-import argparse
 import signal
 import sys
 
-from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
 
-from .game import MODES, SINGLE
+from .menu import MenuWidget
 from .view import GameWidget
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Bring your rocket into the target orbit.")
-    parser.add_argument("--seed", type=int, default=None, help="seed for the first level")
-    parser.add_argument(
-        "--mode", choices=MODES, default=SINGLE,
-        help="single: one planet; moon: travel between a planet and its moon (default: single)",
-    )
-    args = parser.parse_args()
+class MainWindow(QMainWindow):
+    """Main menu and game screen in one window."""
 
+    def __init__(self) -> None:
+        super().__init__()
+        self.setWindowTitle("orbi2d")
+        self.menu = MenuWidget()
+        self.game = GameWidget()
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self.menu)
+        self.stack.addWidget(self.game)
+        self.setCentralWidget(self.stack)
+        self.menu.start_requested.connect(self.start_game)
+        self.menu.quit_requested.connect(self.close)
+        self.game.exit_requested.connect(self.show_menu)
+        self.show_menu()
+
+    def start_game(self, mode: str) -> None:
+        self.game.start_game(mode)
+        self.stack.setCurrentWidget(self.game)
+        self.game.setFocus()
+
+    def show_menu(self) -> None:
+        self.stack.setCurrentWidget(self.menu)
+        self.menu.setFocus()
+
+
+def main() -> int:
     app = QApplication(sys.argv[:1])
     # Ctrl+C in the terminal: quit cleanly. Python only runs signal handlers
-    # between bytecodes, which happens often enough thanks to the game's
-    # 16 ms timer (otherwise Qt's C++ event loop would never yield).
+    # between bytecodes, which happens often enough thanks to the screens'
+    # 16 ms timers (otherwise Qt's C++ event loop would never yield).
     signal.signal(signal.SIGINT, lambda *_: app.quit())
-    win = QMainWindow()
-    win.setWindowTitle("orbi2d")
-    widget = GameWidget(seed=args.seed, mode=args.mode)
-    win.setCentralWidget(widget)
+    win = MainWindow()
     win.resize(1100, 850)
     win.show()
-    widget.setFocus()
     return app.exec()
 
 
