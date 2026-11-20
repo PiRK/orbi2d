@@ -23,29 +23,35 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QWidget
 
 from . import game as g
-from .physics import Orbit
+from .physics import Orbit, Vec
 
 BG = QColor(6, 8, 18)
 CURRENT_COLOR = QColor(80, 190, 255)
 TARGET_COLOR = QColor(110, 255, 140)
+PREDICT_COLOR = QColor(215, 140, 255)
 WARN_COLOR = QColor(255, 200, 80)
 BAD_COLOR = QColor(255, 90, 90)
 TEXT_COLOR = QColor(220, 225, 235)
 DIM_TEXT = QColor(140, 150, 170)
+FAINT = QColor(120, 130, 160, 90)
 
 MIN_VIEW_EXTENT = 380.0
+MIN_MOON_VIEW_EXTENT = 110.0
 
 
 class GameWidget(QWidget):
-    def __init__(self, seed: int | None = None) -> None:
+    def __init__(self, seed: int | None = None, mode: str = g.SINGLE) -> None:
         super().__init__()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMinimumSize(640, 480)
-        self.game = g.Game(seed=seed)
+        self.game = g.Game(seed=seed, mode=mode)
         self.controls = g.Controls()
         self.paused = False
         self.show_help = True
-        self.view_extent = self._desired_extent()
+        self.system_view = False   # moon mode: force the whole-system camera
+        # Camera: ``focus`` blends the view centre from the planet (0) to the
+        # moon (1); ``view_extent`` is the half-size of the view in world units.
+        self.focus, self.view_extent = self._desired_view()
 
         rng = random.Random(1234)
         self.stars = [(rng.random(), rng.random(), rng.uniform(0.3, 1.0)) for _ in range(220)]
@@ -61,17 +67,35 @@ class GameWidget(QWidget):
         dt = min(self.clock.restart() / 1000.0, 0.05)
         if not self.paused:
             self.game.update(dt, self.controls)
-        desired = self._desired_extent()
-        self.view_extent += (desired - self.view_extent) * min(1.0, dt * 2.5)
+        self.step_camera(dt)
         self.update()
 
-    def _desired_extent(self) -> float:
+    def step_camera(self, dt: float) -> None:
+        focus, extent = self._desired_view()
+        k = min(1.0, dt * 2.5)
+        self.focus += (focus - self.focus) * k
+        self.view_extent += (extent - self.view_extent) * k
+
+    def _desired_view(self) -> tuple[float, float]:
         gm = self.game
-        rn = math.hypot(*gm.r)
-        far = max(gm.target.apoapsis, rn)
-        if gm.orbit.bound:
-            far = max(far, min(gm.orbit.apoapsis, g.ESCAPE_RADIUS))
-        return max(MIN_VIEW_EXTENT, 1.12 * far)
+        if gm.moon is None:
+            rn = math.hypot(*gm.r)
+            far = max(gm.target.apoapsis, rn)
+            if gm.orbit.bound:
+                far = max(far, min(gm.orbit.apoapsis, g.ESCAPE_RADIUS))
+            return 0.0, max(MIN_VIEW_EXTENT, 1.12 * far)
+
+        moon, o = gm.moon, gm.orbit
+        if (not self.system_view and gm.primary == g.MOON
+                and o.bound and o.apoapsis < moon.soi):
+            far = max(o.apoapsis, math.hypot(*gm.r))
+            if gm.target_body == g.MOON:
+                far = max(far, gm.target.apoapsis)
+            return 1.0, max(MIN_MOON_VIEW_EXTENT, 1.3 * far)
+        far = max(moon.distance + moon.soi, math.hypot(*gm.world_r))
+        if gm.primary == g.PLANET and o.bound:
+            far = max(far, min(o.apoapsis, g.ESCAPE_RADIUS))
+        return 0.0, max(MIN_VIEW_EXTENT, 1.05 * far)
 
     # ---- input -----------------------------------------------------------
     def _set_key(self, event: QKeyEvent, pressed: bool) -> bool:
@@ -101,6 +125,10 @@ class GameWidget(QWidget):
         ):
             gm.reset()
             self.paused = False
+        elif key == Qt.Key.Key_M:
+            self.switch_mode()
+        elif key == Qt.Key.Key_V:
+            self.system_view = not self.system_view
         elif key == Qt.Key.Key_P:
             self.paused = not self.paused
         elif key == Qt.Key.Key_H:
@@ -115,6 +143,14 @@ class GameWidget(QWidget):
             self.window().close()
         else:
             super().keyPressEvent(event)
+
+    def switch_mode(self) -> None:
+        old = self.game
+        mode = g.MOON_MODE if old.mode == g.SINGLE else g.SINGLE
+        self.game = g.Game(mode=mode)
+        self.game.set_warp(old.time_warp)
+        self.paused = False
+        self.focus, self.view_extent = self._desired_view()
 
     def keyReleaseEvent(self, event: QKeyEvent) -> None:  # noqa: N802
         if event.isAutoRepeat():
@@ -132,9 +168,18 @@ class GameWidget(QWidget):
     def scale(self) -> float:
         return 0.5 * min(self.width(), self.height()) / self.view_extent
 
+    @property
+    def camera_center(self) -> Vec:
+        gm = self.game
+        if gm.moon is None or self.focus == 0.0:
+            return 0.0, 0.0
+        mx, my = gm.moon.position(gm.elapsed)
+        return self.focus * mx, self.focus * my
+
     def to_screen(self, x: float, y: float) -> QPointF:
         s = self.scale
-        return QPointF(self.width() / 2 + x * s, self.height() / 2 - y * s)
+        cx, cy = self.camera_center
+        return QPointF(self.width() / 2 + (x - cx) * s, self.height() / 2 - (y - cy) * s)
 
     # ---- painting ----------------------------------------------------------
     def paintEvent(self, event) -> None:  # noqa: N802
@@ -144,13 +189,30 @@ class GameWidget(QWidget):
         self._draw_stars(p)
 
         gm = self.game
+        moon = gm.moon
+        soi = moon.soi if moon else None
+        if moon:
+            self._draw_moon_path(p)
         matched = gm.deviation <= gm.tolerance
-        self._draw_orbit(p, gm.target, TARGET_COLOR, dashed=True, width=2.0 if not matched else 3.0)
-        cur_color = TARGET_COLOR if matched else (BAD_COLOR if not gm.orbit.bound else CURRENT_COLOR)
-        self._draw_orbit(p, gm.orbit, cur_color, dashed=False, width=1.6)
+        target_center = gm.body_position(gm.target_body)
+        primary_center = gm.body_position(gm.primary)
+        self._draw_orbit(p, gm.target, TARGET_COLOR, dashed=True,
+                         width=2.0 if not matched else 3.0, center=target_center)
+        tr = gm.transition
+        if tr is not None:
+            self._draw_transition(p, tr)
+        # Unbound around the moon is just a flyby; unbound around the planet
+        # means leaving the system.
+        escaping = not gm.orbit.bound and gm.primary == g.PLANET
+        cur_color = TARGET_COLOR if matched else (BAD_COLOR if escaping else CURRENT_COLOR)
+        clip = soi if gm.primary == g.MOON else None
+        self._draw_orbit(p, gm.orbit, cur_color, dashed=False, width=1.6,
+                         center=primary_center, clip=clip)
         self._draw_planet(p)
-        self._draw_apsides(p, gm.target, TARGET_COLOR)
-        self._draw_apsides(p, gm.orbit, cur_color)
+        if moon:
+            self._draw_moon(p, moon.position(gm.elapsed))
+        self._draw_apsides(p, gm.target, TARGET_COLOR, target_center)
+        self._draw_apsides(p, gm.orbit, cur_color, primary_center, clip)
         self._draw_rocket(p)
         self._draw_hud(p)
         self._draw_banner(p)
@@ -180,11 +242,74 @@ class GameWidget(QWidget):
         p.setBrush(QBrush(grad))
         p.drawEllipse(c, r, r)
 
-    def _draw_orbit(self, p: QPainter, orbit: Orbit, color: QColor, dashed: bool, width: float) -> None:
-        pts = orbit.sample(480, r_max=g.ESCAPE_RADIUS)
-        path = QPainterPath(self.to_screen(*pts[0]))
-        for x, y in pts[1:]:
-            path.lineTo(self.to_screen(x, y))
+    def _draw_moon(self, p: QPainter, pos: Vec) -> None:
+        c = self.to_screen(*pos)
+        r = self.game.moon.radius * self.scale
+        grad = QRadialGradient(c + QPointF(-0.35 * r, -0.35 * r), 1.3 * r)
+        grad.setColorAt(0.0, QColor(225, 222, 210))
+        grad.setColorAt(0.6, QColor(150, 146, 138))
+        grad.setColorAt(1.0, QColor(55, 54, 52))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(grad))
+        p.drawEllipse(c, r, r)
+
+    def _draw_moon_path(self, p: QPainter) -> None:
+        """Moon's orbit around the planet and its sphere of influence."""
+        gm = self.game
+        moon = gm.moon
+        s = self.scale
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(FAINT, 1))
+        p.drawEllipse(self.to_screen(0, 0), moon.distance * s, moon.distance * s)
+        pen = QPen(QColor(170, 170, 200, 110), 1)
+        pen.setStyle(Qt.PenStyle.DotLine)
+        p.setPen(pen)
+        p.drawEllipse(self.to_screen(*moon.position(gm.elapsed)), moon.soi * s, moon.soi * s)
+
+    def _draw_transition(self, p: QPainter, tr: g.Transition) -> None:
+        """Predicted SOI crossing: ghost moon, crossing point, next orbit."""
+        gm = self.game
+        moon = gm.moon
+        s = self.scale
+        if tr.body == g.MOON:
+            # Where the moon will be when the rocket arrives.
+            c = self.to_screen(*tr.moon_pos)
+            pen = QPen(PREDICT_COLOR, 1)
+            pen.setStyle(Qt.PenStyle.DotLine)
+            p.setPen(pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawEllipse(c, moon.soi * s, moon.soi * s)
+            p.setPen(QPen(PREDICT_COLOR, 1.2))
+            p.drawEllipse(c, moon.radius * s, moon.radius * s)
+            center, clip = tr.moon_pos, moon.soi
+        else:
+            center, clip = (0.0, 0.0), None
+        self._draw_orbit(p, tr.orbit, PREDICT_COLOR, dashed=True, width=1.3,
+                         center=center, clip=clip)
+        pt = self.to_screen(*tr.point)
+        p.setPen(QPen(PREDICT_COLOR, 1.5))
+        p.setBrush(QBrush(BG))
+        p.drawPolygon(QPolygonF([pt + QPointF(0, -5), pt + QPointF(5, 0),
+                                 pt + QPointF(0, 5), pt + QPointF(-5, 0)]))
+
+    def _draw_orbit(self, p: QPainter, orbit: Orbit, color: QColor, dashed: bool,
+                    width: float, center: Vec = (0.0, 0.0), clip: float | None = None) -> None:
+        """Draw ``orbit`` around ``center``; parts farther than ``clip`` from
+        the centre (outside a sphere of influence) are left out."""
+        cx, cy = center
+        pts = orbit.sample(480, r_max=clip if clip is not None else g.ESCAPE_RADIUS)
+        path = QPainterPath()
+        pen_down = False
+        for x, y in pts:
+            if clip is not None and math.hypot(x, y) > clip * 1.0001:
+                pen_down = False
+                continue
+            q = self.to_screen(cx + x, cy + y)
+            if pen_down:
+                path.lineTo(q)
+            else:
+                path.moveTo(q)
+                pen_down = True
         pen = QPen(color, width)
         if dashed:
             pen.setStyle(Qt.PenStyle.DashLine)
@@ -192,7 +317,8 @@ class GameWidget(QWidget):
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawPath(path)
 
-    def _draw_apsides(self, p: QPainter, orbit: Orbit, color: QColor) -> None:
+    def _draw_apsides(self, p: QPainter, orbit: Orbit, color: QColor,
+                      center: Vec = (0.0, 0.0), clip: float | None = None) -> None:
         if orbit.e < 1e-3:
             return  # circular: apsides undefined
         p.setFont(QFont("monospace", 8))
@@ -200,7 +326,10 @@ class GameWidget(QWidget):
         if orbit.bound:
             marks.append(("Ap", math.pi))
         for label, nu in marks:
-            pt = self.to_screen(*orbit.point_at(nu))
+            x, y = orbit.point_at(nu)
+            if clip is not None and math.hypot(x, y) > clip:
+                continue
+            pt = self.to_screen(center[0] + x, center[1] + y)
             p.setPen(QPen(color, 1.5))
             p.setBrush(QBrush(BG))
             p.drawEllipse(pt, 3.5, 3.5)
@@ -209,12 +338,13 @@ class GameWidget(QWidget):
 
     def _draw_rocket(self, p: QPainter) -> None:
         gm = self.game
-        pos = self.to_screen(*gm.r)
+        pos = self.to_screen(*gm.world_r)
         # Screen y is flipped, so negate the angle for Qt's rotation.
         p.save()
         p.translate(pos)
 
-        # Prograde / retrograde markers around the ship.
+        # Prograde / retrograde markers (velocity relative to the body being
+        # orbited) around the ship.
         vx, vy = gm.v
         vang = -math.atan2(vy, vx)
         ring = 26.0
@@ -267,14 +397,20 @@ class GameWidget(QWidget):
         o, t = gm.orbit, gm.target
         rn = math.hypot(*gm.r)
         speed = math.hypot(*gm.v)
+        moon_mode = gm.moon is not None
 
         def fmt(x: float) -> str:
             return "  ∞  " if not math.isfinite(x) else f"{x:7.1f}"
 
         lines = [
-            (TEXT_COLOR, f"Altitude {rn - gm.planet_radius:7.1f}   Speed {speed:6.1f}"),
+            (TEXT_COLOR, f"Altitude {rn - gm.radius_of(gm.primary):7.1f}   Speed {speed:6.1f}"),
             (TEXT_COLOR, f"Δv used  {gm.burn_dv:7.1f}   Time  {gm.elapsed:6.1f}s"),
             (TEXT_COLOR, ""),
+        ]
+        if moon_mode:
+            lines.insert(2, (TEXT_COLOR, f"Orbiting {gm.primary.capitalize():7}   "
+                                         f"Target around {gm.target_body.capitalize()}"))
+        lines += [
             (DIM_TEXT, "            Periapsis  Apoapsis  Ecc."),
             (CURRENT_COLOR, f"Current      {fmt(o.periapsis)}   {fmt(o.apoapsis)}  {o.e:5.3f}"),
             (TARGET_COLOR, f"Target       {fmt(t.periapsis)}   {fmt(t.apoapsis)}  {t.e:5.3f}"),
@@ -290,7 +426,12 @@ class GameWidget(QWidget):
         dev = gm.deviation
         y += 6
         p.setPen(DIM_TEXT)
-        dev_txt = "escape" if not math.isfinite(dev) else f"{100 * dev:6.2f}%"
+        if math.isfinite(dev):
+            dev_txt = f"{100 * dev:6.2f}%"
+        elif moon_mode and gm.primary != gm.target_body:
+            dev_txt = f"  --  (get to the {gm.target_body} first)"
+        else:
+            dev_txt = "escape"
         p.drawText(14, y + 11, f"Deviation {dev_txt}  (win ≤ {100 * gm.tolerance:.1f}%)")
         bar = QRectF(14, y + 18, 300, 10)
         p.setPen(QPen(DIM_TEXT, 1))
@@ -312,14 +453,21 @@ class GameWidget(QWidget):
         p.setFont(QFont("monospace", 10))
         right = []
         right.append((TEXT_COLOR, f"Time warp x{gm.time_warp:g}"))
+        if moon_mode and self.system_view:
+            right.append((DIM_TEXT, "System view"))
         if self.paused:
             right.append((WARN_COLOR, "PAUSED"))
         if gm.thrusting:
             right.append((WARN_COLOR, "ENGINE " + ("FINE" if self.controls.fine else "FULL")))
-        if not o.bound and gm.status == "playing":
-            right.append((BAD_COLOR, "ESCAPE TRAJECTORY"))
-        elif o.periapsis < gm.planet_radius and gm.status == "playing":
-            right.append((BAD_COLOR, "IMPACT TRAJECTORY"))
+        if gm.status == "playing":
+            tr = gm.transition
+            if tr is not None:
+                what = "MOON ENCOUNTER" if tr.body == g.MOON else "LEAVING MOON SOI"
+                right.append((PREDICT_COLOR, f"{what} in {tr.time - gm.elapsed:5.1f}s"))
+            if not o.bound and gm.primary == g.PLANET:
+                right.append((BAD_COLOR, "ESCAPE TRAJECTORY"))
+            elif o.periapsis < gm.radius_of(gm.primary) and tr is None:
+                right.append((BAD_COLOR, "IMPACT TRAJECTORY"))
         y = 22
         for color, text in right:
             p.setPen(color)
@@ -330,7 +478,9 @@ class GameWidget(QWidget):
         if self.show_help:
             help_lines = [
                 "←/→ rotate   ↑ main engine   Shift fine control",
-                "1-6 or +/- time warp   P pause   R new orbit   H hide help   Esc quit",
+                "1-6 or +/- time warp   P pause   R new orbit   M switch mode"
+                + ("   V system view" if moon_mode else ""),
+                "H hide help   Esc quit",
             ]
             p.setFont(QFont("monospace", 9))
             p.setPen(DIM_TEXT)
