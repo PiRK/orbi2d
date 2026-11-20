@@ -5,6 +5,9 @@ random orbit around a planet. Put it on the dashed green target orbit, to
 within 2% (the largest radial gap between the two curves, relative to the
 target).
 
+This started as a vibe-coding project. The first few prompts are documented
+for posterity in [claude_session.txt](claude_session.txt).
+
 ## Run
 
     pip install -r requirements.txt
