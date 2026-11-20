@@ -9,6 +9,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 - The README screenshot shows the start screen.
+- Lunar Transfer: back around the planet for a planet target, the camera
+  zooms in on the planet once the orbit can't reach the moon, instead of
+  always keeping the moon's whole orbit on screen.
 
 ### Added
 - This changelog.

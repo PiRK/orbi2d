@@ -83,8 +83,9 @@ makes burns finer: at ×0.25 a tap on Space changes your speed 4× less.
   encounter, coast in, then burn retrograde near the moon's periapsis to be
   captured, and fine-tune. To go back, burn prograde around the moon until you
   leave its SOI.
-- While you orbit the moon the camera zooms in on it. Press V for the whole
-  system.
+- While you orbit the moon the camera zooms in on it. Back around the planet
+  for a planet target, it zooms in on the planet as soon as your orbit can't
+  reach the moon any more. Press V for the whole system.
 
 ## Physics
 

@@ -96,14 +96,19 @@ class GameWidget(QWidget):
         self.focus += (focus - self.focus) * k
         self.view_extent += (extent - self.view_extent) * k
 
+    def _planet_view(self) -> tuple[float, float]:
+        """Frame the current orbit and the target around the planet."""
+        gm = self.game
+        rn = math.hypot(*gm.r)
+        far = max(gm.target.apoapsis, rn)
+        if gm.orbit.bound:
+            far = max(far, min(gm.orbit.apoapsis, g.ESCAPE_RADIUS))
+        return 0.0, max(MIN_VIEW_EXTENT, 1.12 * far)
+
     def _desired_view(self) -> tuple[float, float]:
         gm = self.game
         if gm.moon is None:
-            rn = math.hypot(*gm.r)
-            far = max(gm.target.apoapsis, rn)
-            if gm.orbit.bound:
-                far = max(far, min(gm.orbit.apoapsis, g.ESCAPE_RADIUS))
-            return 0.0, max(MIN_VIEW_EXTENT, 1.12 * far)
+            return self._planet_view()
 
         moon, o = gm.moon, gm.orbit
         if (not self.system_view and gm.primary == g.MOON
@@ -112,6 +117,13 @@ class GameWidget(QWidget):
             if gm.target_body == g.MOON:
                 far = max(far, gm.target.apoapsis)
             return 1.0, max(MIN_MOON_VIEW_EXTENT, 1.3 * far)
+        # Back around the planet for a planet target, on an orbit that can't
+        # reach the moon: zoom on the planet as in Planetary Orbit mode, so
+        # the final adjustments aren't made from the whole-system view.
+        if (not self.system_view and gm.primary == g.PLANET
+                and gm.target_body == g.PLANET and o.bound
+                and o.apoapsis < moon.distance - moon.soi and gm.transition is None):
+            return self._planet_view()
         far = max(moon.distance + moon.soi, math.hypot(*gm.world_r))
         if gm.primary == g.PLANET and o.bound:
             far = max(far, min(o.apoapsis, g.ESCAPE_RADIUS))
