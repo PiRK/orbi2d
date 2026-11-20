@@ -3,8 +3,10 @@
 # - On a published GitHub release: builds from the release tag and attaches
 #   both files to that release.
 # - Manually (Actions tab > Standalone builds > Run workflow): builds from the
-#   chosen tag or branch; if "release_tag" is set, attaches the files to that
-#   existing release, otherwise they are only kept as workflow artifacts.
+#   branch picked in "Use workflow from" (normally master); if "release_tag" is
+#   set, attaches the files to that existing release, otherwise they are only
+#   kept as workflow artifacts. This lets older releases, made before these
+#   build scripts existed, get standalone builds too.
 
 name: Standalone builds
 
@@ -39,7 +41,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.TAG || github.ref }}
+          # Release event: build the released tag. Manual run: build the
+          # selected branch, whatever release the files are attached to.
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
 
       - uses: actions/setup-python@v5
         with:
