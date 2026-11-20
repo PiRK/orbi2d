@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 PiRK
+# SPDX-License-Identifier: MIT
+
 """Game state and rules (no Qt dependency, so it can be unit-tested)."""
 
 from __future__ import annotations

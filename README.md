@@ -48,3 +48,7 @@ Tuning constants are at the top of `orbi2d/game.py`.
 ## Tests
 
     python -m pytest
+
+## License
+
+MIT. See [LICENSE](LICENSE).

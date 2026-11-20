@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 PiRK
+# SPDX-License-Identifier: MIT
+
 import math
 
 import pytest

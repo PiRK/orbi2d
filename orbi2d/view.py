@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 PiRK
+# SPDX-License-Identifier: MIT
+
 """Qt rendering and input handling."""
 
 from __future__ import annotations

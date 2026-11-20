@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 PiRK
+# SPDX-License-Identifier: MIT
+
 """Two-body orbital mechanics in 2D.
 
 The rocket is a point mass orbiting a planet of gravitational parameter ``mu``.
