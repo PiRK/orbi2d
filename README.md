@@ -17,7 +17,8 @@ target).
 | ← / →          | Side thrusters: rotate the ship (orientation only) |
 | ↑              | Main engine                                      |
 | Shift (held)   | Fine control: 10% thrust, slower rotation        |
-| 1–4, + / −     | Time warp ×1 / ×2 / ×4 / ×8                      |
+| 1–6            | Time warp presets ×0.25 / ×0.5 / ×1 / ×2 / ×4 / ×8 |
+| + / −          | Time warp ×1.25 / ÷1.25 (range ×0.1 – ×16)       |
 | P              | Pause                                            |
 | R / N          | New random level                                 |
 | H              | Toggle help                                      |
@@ -26,6 +27,10 @@ target).
 The yellow circle next to the ship marks the **prograde** direction (where the
 ship is moving). The red ✕ marks **retrograde**. Pe/Ap mark periapsis and
 apoapsis.
+
+The game starts at ×0.5 time warp. Turning always happens in real time, but
+orbital motion and engine thrust follow the warp. Slow motion therefore also
+makes burns finer: at ×0.25 a tap on ↑ changes your speed 4× less.
 
 ## Physics
 

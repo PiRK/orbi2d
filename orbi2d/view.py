@@ -105,12 +105,12 @@ class GameWidget(QWidget):
             self.paused = not self.paused
         elif key == Qt.Key.Key_H:
             self.show_help = not self.show_help
-        elif Qt.Key.Key_1 <= key <= Qt.Key.Key_4:
-            gm.set_warp(key - Qt.Key.Key_1)
+        elif Qt.Key.Key_1 <= key < Qt.Key.Key_1 + len(g.WARP_PRESETS):
+            gm.set_warp(g.WARP_PRESETS[key - Qt.Key.Key_1])
         elif key in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
-            gm.set_warp(gm.warp_index + 1)
-        elif key == Qt.Key.Key_Minus:
-            gm.set_warp(gm.warp_index - 1)
+            gm.faster()
+        elif key in (Qt.Key.Key_Minus, Qt.Key.Key_Underscore):
+            gm.slower()
         elif key in (Qt.Key.Key_Escape, Qt.Key.Key_Q):
             self.window().close()
         else:
@@ -311,7 +311,7 @@ class GameWidget(QWidget):
         # Top-right status.
         p.setFont(QFont("monospace", 10))
         right = []
-        right.append((TEXT_COLOR, f"Time warp x{gm.time_warp}"))
+        right.append((TEXT_COLOR, f"Time warp x{gm.time_warp:g}"))
         if self.paused:
             right.append((WARN_COLOR, "PAUSED"))
         if gm.thrusting:
@@ -330,7 +330,7 @@ class GameWidget(QWidget):
         if self.show_help:
             help_lines = [
                 "←/→ rotate   ↑ main engine   Shift fine control",
-                "1-4 or +/- time warp   P pause   R new orbit   H hide help   Esc quit",
+                "1-6 or +/- time warp   P pause   R new orbit   H hide help   Esc quit",
             ]
             p.setFont(QFont("monospace", 9))
             p.setPen(DIM_TEXT)

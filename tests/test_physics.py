@@ -135,3 +135,31 @@ def test_game_finite_burn_tracks_orbit_and_can_win():
     game.target = Orbit(p=o0.p, e=o0.e, omega=o0.omega)
     game.update(1 / 60, Controls())
     assert game.status == "won"
+
+
+def test_time_warp_steps_and_limits():
+    from orbi2d import game as g
+
+    game = Game(seed=1)
+    assert game.time_warp == g.DEFAULT_WARP
+    for _ in range(3):
+        game.faster()
+    for _ in range(3):
+        game.slower()
+    assert game.time_warp == g.DEFAULT_WARP
+    for _ in range(100):
+        game.faster()
+    assert game.time_warp == g.MAX_WARP
+    for _ in range(100):
+        game.slower()
+    assert game.time_warp == g.MIN_WARP
+
+
+def test_time_warp_scales_game_time():
+    slow, fast = Game(seed=2), Game(seed=2)
+    slow.set_warp(0.25)
+    fast.set_warp(1.0)
+    for _ in range(4):
+        slow.update(1 / 60, Controls())
+    fast.update(1 / 60, Controls())
+    assert slow.r == pytest.approx(fast.r, rel=1e-9)

@@ -23,7 +23,11 @@ FINE_ROTATION_SPEED = math.radians(40)   # with Shift held
 TOLERANCE = 0.02           # max relative radial deviation to win (2 %)
 ESCAPE_RADIUS = 3000.0     # beyond this the rocket is lost
 MAX_STEP_DISTANCE = 4.0    # sub-step size used for collision / thrust
-TIME_WARPS = (1, 2, 4, 8)
+WARP_PRESETS = (0.25, 0.5, 1.0, 2.0, 4.0, 8.0)  # keys 1-6
+DEFAULT_WARP = 0.5
+MIN_WARP = 0.1
+MAX_WARP = 16.0
+WARP_STEP = 1.25           # +/- multiply / divide the warp by this
 
 
 @dataclass
@@ -66,7 +70,7 @@ class Game:
     status: str = "playing"        # playing | won | crashed | escaped
     thrusting: bool = False
     rotating: int = 0              # -1 right (cw), +1 left (ccw), 0 none
-    warp_index: int = 0
+    time_warp: float = DEFAULT_WARP  # game seconds per real second
     elapsed: float = 0.0
     burn_dv: float = 0.0           # total delta-v spent
     deviation: float = math.inf
@@ -92,12 +96,17 @@ class Game:
         self.burn_dv = 0.0
         self._refresh_orbit()
 
-    @property
-    def time_warp(self) -> int:
-        return TIME_WARPS[self.warp_index]
+    def set_warp(self, warp: float) -> None:
+        # Snap to 3 significant digits so repeated +/- steps don't drift
+        # (0.5 * 1.25 / 1.25 lands back on exactly 0.5).
+        warp = float(f"{warp:.3g}")
+        self.time_warp = max(MIN_WARP, min(MAX_WARP, warp))
 
-    def set_warp(self, index: int) -> None:
-        self.warp_index = max(0, min(len(TIME_WARPS) - 1, index))
+    def faster(self) -> None:
+        self.set_warp(self.time_warp * WARP_STEP)
+
+    def slower(self) -> None:
+        self.set_warp(self.time_warp / WARP_STEP)
 
     def _refresh_orbit(self) -> None:
         self.orbit = Orbit.from_state(self.r, self.v, self.mu)
