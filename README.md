@@ -14,7 +14,7 @@ Pick a mode on the start screen:
   planet to the moon or from the moon back to the planet.
 - **Solar System**: a compressed solar system with the Sun, the blue planet
   and its moon, a red planet and a gas giant. You start around the blue
-  planet; the target orbit is around the Sun or the gas giant.
+  planet; the target orbit is around the gas giant.
 
 This started as a vibe-coding project. The first few prompts are documented
 for posterity in [claude_session.txt](https://github.com/PiRK/orbi2d/blob/master/claude_session.txt).
@@ -106,6 +106,35 @@ makes burns finer: at ×0.25 a tap on Space changes your speed 4× less.
   (slingshot), and the prediction shows its effect before you get there.
 - The camera follows the body you are orbiting and zooms on a log scale;
   V shows the whole system.
+
+### Gravity assists
+
+Slingshots are a bonus: the win screen shows the Δv you spent and the
+free Δv you got from flybys. Aids for aiming them:
+
+- **Transfer window** (target around the gas giant): the HUD shows how far
+  ahead of the blue planet the gas giant is, the ideal angle for a direct
+  (Hohmann) transfer, and the time until it comes round. Warp until then,
+  and leave the blue planet moving along its own orbital motion.
+- **Closest approach** (amber): before you have an encounter, the predicted
+  path shows where it passes closest to the target's planet (and to other
+  planets passed nearby), where that planet will be, and the distance
+  next to the planet's SOI radius: you need to get below it. For the
+  target's planet, a second line says whether you arrive early or late and
+  which burn closes the gap, e.g. `115 s early: burn prograde to close in`.
+  The game finds that burn by re-predicting your path with a tiny prograde
+  and a tiny retrograde nudge (a simple "early → slow down" rule is often
+  wrong: near the far end of a transfer, slowing down means not arriving at
+  all). Short fine (Shift) bursts in that direction, at low warp, until
+  the purple encounter appears. If no single burn helps, or the path only
+  moves away from the planet, the marker says so: wait for the next window.
+- **Predicted flyby**: `GAS GIANT ENCOUNTER in 415.5s (assist +166)` shows
+  how much the flyby will change your speed around the Sun, and the
+  predicted path is marked with the flyby's periapsis altitude (`Pe alt`).
+  Passing behind the planet (relative to its motion) speeds you up, in
+  front of it slows you down; closer means stronger.
+- An orbit that would carry you out of the system (open, or reaching past
+  the edge after a big slingshot) is drawn in red.
 
 ## Physics
 

@@ -45,6 +45,27 @@ THRUST_KEYS = (Qt.Key.Key_Space, Qt.Key.Key_Up)
 MIN_MOON_VIEW_EXTENT = 110.0
 
 
+def fmt_dist(d: float) -> str:
+    """Compact distance: 850, 4.2k, 51k."""
+    if d >= 10_000:
+        return f"{d / 1000:.0f}k"
+    if d >= 1000:
+        return f"{d / 1000:.1f}k"
+    return f"{d:.0f}"
+
+
+def approach_hint(a: g.ClosestApproach) -> str:
+    """Early or late, and the burn that the game found brings it closer."""
+    if a.receding and a.fix == 0:
+        return "moving away from it: try the next window"
+    when = f"{abs(a.lead):.0f} s {'early' if a.lead > 0 else 'late'}"
+    if a.fix > 0:
+        return f"{when}: burn prograde to close in"
+    if a.fix < 0:
+        return f"{when}: burn retrograde to close in"
+    return f"{when}: no single burn helps (next window?)"
+
+
 class GameWidget(QWidget):
     exit_requested = Signal()  # Esc: back to the main menu
 
@@ -328,8 +349,9 @@ class GameWidget(QWidget):
                          clip=self._clip_for(gm.target_body))
         for i, tr in enumerate(gm.transitions):
             self._draw_solar_transition(p, tr, alpha=255 - 60 * i)
+        self._draw_approaches(p)
         primary_center = gm.body_position(gm.primary)
-        escaping = not gm.orbit.bound and gm.primary == gm.root
+        escaping = self._solar_escaping()
         cur_color = TARGET_COLOR if matched else (BAD_COLOR if escaping else CURRENT_COLOR)
         clip = self._clip_for(gm.primary)
         self._draw_orbit(p, gm.orbit, cur_color, dashed=False, width=1.6,
@@ -340,6 +362,13 @@ class GameWidget(QWidget):
         self._draw_rocket(p)
         self._draw_hud(p)
         self._draw_banner(p)
+
+    def _solar_escaping(self) -> bool:
+        """Around the Sun on an orbit that leaves the play area (open, or
+        reaching past the escape radius, e.g. after a big slingshot)."""
+        gm = self.game
+        o = gm.orbit
+        return gm.primary == gm.root and (not o.bound or o.apoapsis > gm.escape_radius)
 
     def _clip_for(self, body: str) -> float | None:
         b = self.game.bodies[body]
@@ -381,11 +410,57 @@ class GameWidget(QWidget):
             p.drawEllipse(c, r_px, r_px)
         self._draw_orbit(p, tr.orbit, color, dashed=True, width=1.3,
                          center=tr.body_pos, clip=self._clip_for(tr.body))
+        if body.parent is not None and tr.orbit.periapsis < body.soi:
+            # Where the flyby passes closest, and how high above the surface.
+            x, y = tr.orbit.point_at(0.0)
+            pe = self.to_screen(tr.body_pos[0] + x, tr.body_pos[1] + y)
+            p.setPen(QPen(color, 1.5))
+            p.setBrush(QBrush(BG))
+            p.drawEllipse(pe, 3.5, 3.5)
+            p.setFont(QFont("monospace", 8))
+            p.setPen(color)
+            alt = tr.orbit.periapsis - body.radius
+            p.drawText(pe + QPointF(6, -6), "IMPACT" if alt <= 0 else f"Pe alt {fmt_dist(alt)}")
         pt = self.to_screen(*tr.point)
         p.setPen(QPen(color, 1.5))
         p.setBrush(QBrush(BG))
         p.drawPolygon(QPolygonF([pt + QPointF(0, -5), pt + QPointF(5, 0),
                                  pt + QPointF(0, 5), pt + QPointF(-5, 0)]))
+
+    def _draw_approaches(self, p: QPainter) -> None:
+        """Closest approaches to the target's planet, and to other planets
+        passed nearby: where the rocket and the planet will be, how far."""
+        gm = self.game
+        s = self.scale
+        entered = {tr.body for tr in gm.transitions}
+        color = QColor(WARN_COLOR)
+        for a in gm.approaches:
+            body = gm.bodies[a.body]
+            if a.body in entered or body.parent is None:
+                continue
+            if a.body != gm.target_body and a.distance > 4 * body.soi:
+                continue
+            rocket = self.to_screen(*a.point)
+            planet = self.to_screen(*a.body_pos)
+            pen = QPen(color, 1)
+            pen.setStyle(Qt.PenStyle.DashLine)
+            p.setPen(pen)
+            p.drawLine(rocket, planet)
+            pen.setStyle(Qt.PenStyle.DotLine)
+            p.setPen(pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawEllipse(planet, body.soi * s, body.soi * s)
+            p.setPen(QPen(color, 1.3))
+            r_px = max(body.radius * s, 3.0)
+            p.drawEllipse(planet, r_px, r_px)
+            p.drawLine(rocket + QPointF(-4, -4), rocket + QPointF(4, 4))
+            p.drawLine(rocket + QPointF(-4, 4), rocket + QPointF(4, -4))
+            p.setFont(QFont("monospace", 8))
+            p.setPen(color)
+            mid = (rocket + planet) / 2
+            p.drawText(mid + QPointF(6, -4),
+                       f"closest {fmt_dist(a.distance)} (SOI {fmt_dist(body.soi)})")
+            p.drawText(mid + QPointF(6, 8), approach_hint(a))
 
     def _draw_planet(self, p: QPainter) -> None:
         draw_planet(p, self.to_screen(0, 0), self.game.planet_radius * self.scale)
@@ -518,6 +593,21 @@ class GameWidget(QWidget):
         if moon_mode:
             lines.insert(2, (TEXT_COLOR, f"Orbiting {gm.label(gm.primary):7}   "
                                          f"Target around {gm.label(gm.target_body)}"))
+        if solar:
+            extra = []
+            window = gm.transfer_window()
+            if window is not None and gm.primary == g.PLANET:
+                phase, ideal, wait = window
+                name = gm.label(gm.target_body)
+                if abs((phase - ideal + 180) % 360 - 180) < 3:
+                    extra.append((TARGET_COLOR, f"Window to {name}: NOW ({phase:.0f}° ahead)"))
+                else:
+                    extra.append((TEXT_COLOR, f"Window to {name}: {phase:.0f}° ahead, "
+                                              f"best {ideal:.0f}° (in {wait:.0f}s)"))
+            if gm.assists:
+                names = ", ".join(gm.label(a.body) for a in gm.assists)
+                extra.append((PREDICT_COLOR, f"Gravity assists: +{gm.assist_dv:.1f} Δv ({names})"))
+            lines[3:3] = extra
         lines += [
             (DIM_TEXT, "            Periapsis  Apoapsis  Ecc."),
             (CURRENT_COLOR, f"Current      {fmt(o.periapsis)}   {fmt(o.apoapsis)}  {o.e:5.3f}"),
@@ -579,11 +669,13 @@ class GameWidget(QWidget):
                     what = f"{gm.label(tr.body).upper()} ENCOUNTER"
                 else:
                     what = f"LEAVING {gm.label(tr.from_body).upper()} SOI"
-                right.append((PREDICT_COLOR, f"{what} in {tr.time - gm.elapsed:6.1f}s"))
+                assist = gm.predicted_assist(0)
+                more = f" (assist +{assist:.0f})" if assist is not None else ""
+                right.append((PREDICT_COLOR, f"{what} in {tr.time - gm.elapsed:6.1f}s{more}"))
             elif tr is not None:
                 what = "MOON ENCOUNTER" if tr.body == g.MOON else "LEAVING MOON SOI"
                 right.append((PREDICT_COLOR, f"{what} in {tr.time - gm.elapsed:5.1f}s"))
-            if not o.bound and gm.primary == gm.root:
+            if (self._solar_escaping() if solar else not o.bound and gm.primary == gm.root):
                 right.append((BAD_COLOR, "ESCAPE TRAJECTORY"))
             elif o.periapsis < gm.radius_of(gm.primary) and tr is None:
                 right.append((BAD_COLOR, "IMPACT TRAJECTORY"))
@@ -621,6 +713,8 @@ class GameWidget(QWidget):
             f"Δv {gm.burn_dv:.1f}   time {gm.elapsed:.1f}s   deviation {100 * gm.deviation:.2f}%"
             if gm.status == "won" else ""
         )
+        if sub and gm.mode == g.SOLAR and gm.assists:
+            sub += f"   gravity assists +{gm.assist_dv:.1f} Δv"
         rect = QRectF(0, self.height() * 0.18, self.width(), 50)
         p.setFont(QFont("sans-serif", 28, QFont.Weight.Bold))
         p.setPen(color)

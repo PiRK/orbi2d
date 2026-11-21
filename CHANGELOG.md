@@ -10,7 +10,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 - Solar System mode: a compressed solar system (Sun, the blue planet and its
   moon, a red planet, a gas giant). Start around the blue planet, reach a
-  target orbit around the Sun or the gas giant. Gravity assists work
+  target orbit around the gas giant. Gravity assists work
   naturally through the patched conics.
 - Physics generalised to a tree of bodies, with SOI crossings at any depth.
 - Prediction of the next 3 SOI crossings, each with the orbit that follows.
@@ -18,6 +18,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   ceiling; limited by orbit period, the next predicted crossing, and engine
   burns), and a camera that follows the orbited body with log-scale zoom.
 - The CI smoke test also opens a Solar System game at high warp.
+- Gravity-assist aids in Solar System mode: transfer window to the gas giant
+  (current and ideal phase angle, time until the window), closest-approach
+  markers on the predicted path (with an early/late hint and the burn
+  direction that closes the gap, found by re-predicting with small nudges),
+  predicted assist gain and flyby periapsis
+  altitude on encounters, completed assists in the HUD and on the win
+  screen, and a red orbit when it would leave the system.
 
 ## [0.2.1] - 2026-11-20
 
