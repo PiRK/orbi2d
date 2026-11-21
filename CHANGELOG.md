@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-21
+
 ### Added
 - Solar System mode: a compressed solar system (Sun, the blue planet and its
   moon, a red planet, a gas giant). Start around the blue planet, reach a
@@ -83,7 +85,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   the game starts at ×0.5.
 - MIT license.
 
-[Unreleased]: https://github.com/PiRK/orbi2d/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/PiRK/orbi2d/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/PiRK/orbi2d/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/PiRK/orbi2d/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PiRK/orbi2d/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/PiRK/orbi2d/releases/tag/v0.1.0

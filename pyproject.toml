@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orbi2d"
-version = "0.2.1"
+version = "0.3.0"
 description = "2D orbital mechanics game: steer a rocket onto a target orbit"
 readme = "README.md"
 license = "MIT"
