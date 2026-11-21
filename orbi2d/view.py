@@ -460,7 +460,8 @@ class GameWidget(QWidget):
             mid = (rocket + planet) / 2
             p.drawText(mid + QPointF(6, -4),
                        f"closest {fmt_dist(a.distance)} (SOI {fmt_dist(body.soi)})")
-            p.drawText(mid + QPointF(6, 8), approach_hint(a))
+            if a.body == gm.target_body:   # the hint is about reaching the target
+                p.drawText(mid + QPointF(6, 8), approach_hint(a))
 
     def _draw_planet(self, p: QPainter) -> None:
         draw_planet(p, self.to_screen(0, 0), self.game.planet_radius * self.scale)
