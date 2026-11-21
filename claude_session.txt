@@ -492,3 +492,68 @@ Step 1 is done: the start screen has a fourth entry, Solar System.
 - 13 new tests (39 in total); the CI smoke test also opens a Solar System game at ×1000.
 
 Limitations of this step: no closest-approach markers yet (step 2), so aiming for the gas giant is trial and error, watching for the purple encounter to appear while you burn; the gas giant has no moons.
+
+❯ let's try step 2: usable gravity assists
+
+Step 2 is about giving the player the information needed to aim a flyby, and making a good one rewarding:
+1. Closest-approach markers: before you have an encounter, where your path comes closest to the target planet, where that planet will be at that moment, and how far apart you'll be. This is the main aiming aid.
+2. Flyby periapsis on predicted encounters: "Pe" with its altitude on the predicted flyby path.
+3. The predicted assist gain: "GAS GIANT ENCOUNTER in 103 s (assist +85)", how much your speed around the Sun changes during the flyby (free Δv).
+4. Assist bookkeeping: completed flybys are counted, and the win screen shows "+N from gravity assists". That's the bonus.
+5. A transfer-window helper: the gas giant's current angle ahead of the blue planet, the ideal angle for a direct (Hohmann) transfer, and the time until that window.
+
+Checked against independent calculations: the closest approach matches a brute-force search to 0.01 units; at the predicted window time the gas giant sits exactly at the ideal angle; a predicted assist of +165.50 delivered +165.5 in flight.
+
+(... a full test flight using only these aids: wait for the window at high warp, one departure burn, the gas giant encounter appeared immediately, and the flyby gave +165.5 Δv for free ...)
+
+❯ explain the orange markers (it says "closest 198k (SOI 40k)")
+
+The orange (amber) marker is the closest approach: the point where your predicted path comes nearest to the gas giant, measured from its centre.
+- 198k: on your current path, the nearest you'll get to the gas giant is about 198,000 units.
+- SOI 40k: to get an encounter, you need to pass within its sphere of influence, a radius of about 40,000 units.
+
+The orange × on your path is where you'll be at that moment, the orange circle with a dotted ring is where the gas giant will be then, and the dashed line is the gap you need to close. A miss this big is almost always a timing problem: you cross its orbit, but the planet is somewhere else at that moment. The easier fix is timing the departure with the "Window to Gas giant" line in the HUD.
+
+❯ yes please add the hint to the marker
+
+I added the hint, but not the simple version I proposed. When I tested that rule, it gave the wrong burn direction. On a direct transfer you arrive near the far end of your orbit; slowing down there doesn't make you arrive later, it makes your orbit stop short of the gas giant's distance.
+
+So the game now works the direction out itself: whenever the target's marker is shown, it re-predicts your path with a tiny prograde nudge and a tiny retrograde nudge, and recommends whichever brings the closest approach down. The marker reads, for example, "115 s early: burn prograde to close in", or says when no single burn helps.
+
+Results when following the hint (departures 40–250 s after the ideal window):
+┌───────────────┬─────────────────────────────────┬─────────────────────────────┐
+│ Departure     │ Marker                          │ Following it                │
+├───────────────┼─────────────────────────────────┼─────────────────────────────┤
+│ +40 s         │ 115 s early, burn prograde      │ encounter, 12.3 Δv          │
+├───────────────┼─────────────────────────────────┼─────────────────────────────┤
+│ +80 s         │ 47 s late, burn prograde        │ encounter, 19.5 Δv          │
+├───────────────┼─────────────────────────────────┼─────────────────────────────┤
+│ +120 s        │ moving away from it             │ needs the next window       │
+├───────────────┼─────────────────────────────────┼─────────────────────────────┤
+│ +150 s        │ 234 s early, burn retrograde    │ encounter, 6.3 Δv           │
+├───────────────┼─────────────────────────────────┼─────────────────────────────┤
+│ +200 / +250 s │ no single burn helps            │ needs the next window       │
+└───────────────┴─────────────────────────────────┴─────────────────────────────┘
+
+❯ what's the likelihood that any given game will target the gas giant?
+
+50%. When a Solar System level starts, the game picks the target body with an even coin flip between the Sun and the gas giant. The other half target the Sun, split again 50/50 between an orbit outside the blue planet's orbit and one inside it.
+
+❯ let's make this game mode all about targeting an orbit around the gas giant.
+
+Every Solar System level now goes from the blue planet to an orbit around the gas giant, so the transfer window and the early/late hint apply in every game.
+
+Every level is completable with the aids. Across 12 levels, 2 hit the SOI directly from a departure at the window, and the other 10 missed by a hair (40–42k against an SOI of 40.3k); following the hint gave an encounter every time, for 1–12 Δv of corrections.
+
+❯ prepare two demo videos, one with a properly timed exit from the blue planet's SOI, one with a mistimed exit
+
+I'll record both from the start screen, flown by an autopilot that uses only the game's controls and the information shown on screen.
+
+(... the autopilot needed several fixes along the way: steering during burns, matching the orbit's shape in its current direction, capturing in two burns at closest approach instead of one long burn that dragged the periapsis into the planet, and trimming steps sized to what was tested ...)
+
+Checking the frames was worthwhile: the first "well-timed" video wasn't clean. During a long escape burn the departure direction swings round, so where you start the burn isn't where you effectively leave from. For the timed video, the pilot now does what a player watching the purple prediction does: once the window opens, it picks the moment of the parking orbit that gives an encounter.
+
+1. orbi2d-solar-timed.mp4 (78 s, level 25): the window countdown turns green, one departure burn, and the gas giant encounter appears straight away (assist +116). Then the flyby is aimed at the target's periapsis, cruise at up to ×1000, capture in two burns, one matching burn, trimming, and ORBIT ACHIEVED.
+2. orbi2d-solar-mistimed.mp4 (85 s, level 10): leaving 60 s late, the amber marker shows "closest 141k (SOI 40k) / 389 s early: burn prograde to close in"; following it for about 11 s gives the encounter, then the same finish.
+
+Making them also turned up a display bug: the "early/late" hint line also appeared on other bodies' markers (the moon's during departure). It now only appears on the target planet's marker.
