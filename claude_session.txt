@@ -401,3 +401,94 @@ This is almost certainly a Wine limitation, not a packaging bug:
 - Wine 9.0 doesn't provide icuuc.dll, so under Wine the chain breaks at the first link.
 
 To settle it, the most reliable option is a smoke test on GitHub's Windows runner: launch the freshly built .exe with a hidden switch that makes it quit after 2 seconds, and fail the job unless it exits cleanly.
+
+❯ add the Windows smoke test
+
+The plan:
+1. A hidden smoke-test mode in the game. With ORBI2D_SMOKE_TEST=1 set, the game opens normally, starts a Lunar Transfer game, goes back to the menu, and quits by itself with exit code 0 after about 2 seconds. Any Python error in that time makes it exit with code 1 (normally PySide prints such errors and keeps running, which would hide them).
+2. A workflow step on the Windows runner that launches the built .exe that way. The step fails if the .exe doesn't exit within 2 minutes or exits with a non-zero code. A missing DLL makes the .exe show an error dialog and hang, so that case fails too.
+
+I'll also add the same check for the AppImage on Linux, since it costs one extra step.
+
+Checked locally:
+- Passing run: exit code 0 after 2.0 s.
+- Injected error: exit code 1 with the traceback printed.
+- Normal launch: the game keeps running as usual.
+
+(... later, the 0.2.1 release run: "Smoke test (Windows .exe)" passed in 6 s on GitHub's Windows runner, which confirmed the Wine failure was only Wine's missing icuuc.dll ...)
+
+❯ back to gameplay concerns: the zoom when doing a lunar insertion works fine. But when the game starts from a lunar orbit and goes back to a planetary orbit, I noticed that the zoom is not very effective as the orbit gets closer to the planet. It looks like the zoom tries to keep the moon's orbit on the screen. This makes orbital adjustments a bit tricky in this scenario.
+
+Your diagnosis is right. In Lunar Transfer mode, whenever you're orbiting the planet, the camera always keeps the moon's whole orbit and its sphere of influence on screen. That's about ±780 units, even when your orbit and the target are only about 300 across.
+
+I'll change the rule. When you're orbiting the planet, your target is around the planet, and your orbit can't reach the moon, the camera frames just your orbit and the target, exactly like Planetary Orbit mode. As soon as your orbit could reach the moon, or the target is around the moon, it zooms back out to the whole system. V still forces the system view.
+
+From a test flight, starting around the moon:
+┌───────────────────────────────────────────────┬──────────────────────────────┐
+│ Moment                                        │ View half-size (world units) │
+├───────────────────────────────────────────────┼──────────────────────────────┤
+│ Orbiting the moon                             │ 133 (zoomed on the moon)     │
+├───────────────────────────────────────────────┼──────────────────────────────┤
+│ Just after leaving the moon's SOI             │ 820 (whole system)           │
+├───────────────────────────────────────────────┼──────────────────────────────┤
+│ After lowering the orbit (farthest point 375) │ 420 (was 820 before the fix) │
+├───────────────────────────────────────────────┼──────────────────────────────┤
+│ Same, with V pressed                          │ 820 (whole system on demand) │
+└───────────────────────────────────────────────┴──────────────────────────────┘
+
+The Planetary Orbit view and both Lunar Transfer starting views render pixel-identically to before.
+
+❯ push and commit, then prepare a v2.1 release
+
+For the release, I'm reading "v2.1" as 0.2.1, the next patch version after 0.2.0. A patch number fits: since 0.2.0 there's a camera improvement plus packaging and CI work, and no new game features. "Prepare" means I'll get everything ready locally and stop before anything public.
+
+Release 0.2.1 is ready locally:
+- Version bumped to 0.2.1; the changelog's "Unreleased" section became [0.2.1].
+- The package builds, passes twine check, installs in a clean environment with license MIT, and the smoke test passes on the installed game.
+
+Still to do to publish: push master and the tag v0.2.1, upload to PyPI (can't be undone), and create the GitHub release, which automatically builds, smoke-tests and attaches the .exe and AppImage.
+
+❯ yup
+
+Release 0.2.1 is complete, and the Windows .exe works on real Windows.
+- PyPI: https://pypi.org/project/orbi2d/0.2.1/ (license MIT).
+- GitHub release "orbi2d 0.2.1", marked as latest, with the wheel, source archive, orbi2d-0.2.1-windows-x64.exe (49 MB) and orbi2d-0.2.1-x86_64.AppImage (75 MB).
+- Both smoke tests ran for real: the Windows step took 6 s (about 4 s to unpack the single-file .exe, plus the game's 2-second self-test, ending in a clean exit with code 0).
+
+❯ hello. How difficult would it be to add another game mode with a solar system similar to ours, and with an orbit starting around the blue planet and a target orbit around the sun or around a big gas giant outer planet? With potential slingshot manoeuvres? I anticipate some issue with the time warp amplitude (maybe it will need to auto-adjust, like the zoom auto-adjusts). And maybe it is unrealistic to just wing a slingshot manoeuvre with our rudimentary controls?
+
+It's quite doable. The existing physics already contains most of what's needed, slingshots included. The hard parts are the ones you suspected: scale, time warp, and giving the player enough information to aim.
+
+What carries over almost for free
+- Slingshots come built in. The Lunar Transfer mode uses patched conics. A gravity assist is exactly that: in the planet's frame a flyby is a hyperbola (you leave at the same speed you arrived, in a new direction); converted back to the sun's frame, that gives a different speed around the sun. Generalising the code to a tree of bodies (sun → planets → moons) gives slingshots with no extra physics.
+- High time warp is cheap: coasting is computed exactly (analytic Kepler), so jumping hours ahead costs about the same as jumping one frame.
+
+The real problems
+1. Scale. In the real solar system, Earth is about 23,000 times smaller than its distance to the sun; a low orbit takes 90 minutes while a transfer to Jupiter takes 2.7 years. I'd recommend a compressed system "like ours", the way KSP shrinks its planets.
+2. Time warp: your instinct is right, it has to adjust itself. Your choice becomes a ceiling; warp drops as a predicted SOI crossing approaches, depends on the current orbit's period, and is limited while burning.
+3. Can you wing a slingshot? Not with today's prediction, but with better tools, yes: chained prediction (leaving the planet → around the sun → flyby → the orbit you leave on), closest-approach markers, and optionally planned burns (KSP's "maneuver nodes").
+
+Effort, in steps:
+1. Generalise the bodies, chained prediction, a camera that can focus on any body with logarithmic zoom, automatic time warp, and a "Solar System" mode.
+2. Make slingshots playable: closest-approach markers, levels or scoring where a slingshot clearly pays off.
+3. Optionally, planned burns.
+
+❯ compressed scale, slingshots just a bonus for now, start with step 1
+
+Before touching anything, I'll record reference runs of both existing modes so I can prove they're unchanged afterwards.
+
+(... game.py rewritten around a tree of bodies; Planetary Orbit and Lunar Transfer stay bit-identical in simulation and pixel-identical on screen ...)
+
+The physics checks out on a test flight: the escape from the blue planet was predicted at t=36.74 s and happened at 36.75 s; with ×1000 requested, the game used at most ×215 around the Sun and dropped smoothly to ×1 before the next crossing. On a transfer to the gas giant, prediction and reality agreed across the whole chain (3341.9 s predicted versus 3342.0 s actual), including an unplanned gravity assist from the blue planet on the way out.
+
+(... a frame-time audit found up to 55 ms hitches: a search window ending at a large game time was never "quite reached" because of floating-point rounding, so it burned 20,000 tiny steps. Fixed in both the prediction and the coasting loops, with a regression test ...)
+
+Step 1 is done: the start screen has a fourth entry, Solar System.
+- The system: the Sun, the blue planet and its moon, a small red planet, and a gas giant with a large SOI (periods 460 s, 885 s and 3,330 s). Distances are compressed: the gas giant is about 270 times farther out than the moon, not 23,000 times.
+- Levels: you start around the blue planet; the target orbit is around the gas giant, or around the Sun outside or inside the blue planet's orbit.
+- Prediction shows the next 3 crossings, each with the orbit after it, so you can see a slingshot's effect while you're still burning.
+- Automatic time warp: keys 1–9 go up to ×1000 and your choice is a ceiling: at most 3 orbits per real second, slower as the next crossing approaches, ×8 or below while the engine fires. The HUD shows both, e.g. "Time warp x1000 (auto x70)".
+- Camera: follows whichever body you're orbiting, zooms on a logarithmic scale, glides between bodies; V shows the whole system.
+- 13 new tests (39 in total); the CI smoke test also opens a Solar System game at ×1000.
+
+Limitations of this step: no closest-approach markers yet (step 2), so aiming for the gas giant is trial and error, watching for the purple encounter to appear while you burn; the gas giant has no moons.
