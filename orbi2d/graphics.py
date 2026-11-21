@@ -8,8 +8,8 @@ from __future__ import annotations
 import math
 import random
 
-from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QBrush, QColor, QPainter, QPolygonF, QRadialGradient, QPen
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPolygonF, QRadialGradient
 
 BG = QColor(6, 8, 18)
 CURRENT_COLOR = QColor(80, 190, 255)
@@ -62,6 +62,63 @@ def draw_moon(p: QPainter, c: QPointF, r: float) -> None:
     p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(QBrush(grad))
     p.drawEllipse(c, r, r)
+
+
+def _draw_ball(p: QPainter, c: QPointF, r: float, light: QColor, mid: QColor,
+               dark: QColor) -> None:
+    grad = QRadialGradient(c + QPointF(-0.35 * r, -0.35 * r), 1.3 * r)
+    grad.setColorAt(0.0, light)
+    grad.setColorAt(0.6, mid)
+    grad.setColorAt(1.0, dark)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(grad))
+    p.drawEllipse(c, r, r)
+
+
+def draw_sun(p: QPainter, c: QPointF, r: float) -> None:
+    """Yellow-white star with a soft corona."""
+    glow = QRadialGradient(c, r * 2.2)
+    glow.setColorAt(0.4, QColor(255, 210, 120, 120))
+    glow.setColorAt(1.0, QColor(255, 180, 80, 0))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(glow))
+    p.drawEllipse(c, r * 2.2, r * 2.2)
+    grad = QRadialGradient(c, r)
+    grad.setColorAt(0.0, QColor(255, 255, 235))
+    grad.setColorAt(0.7, QColor(255, 225, 120))
+    grad.setColorAt(1.0, QColor(255, 170, 50))
+    p.setBrush(QBrush(grad))
+    p.drawEllipse(c, r, r)
+
+
+def draw_red_planet(p: QPainter, c: QPointF, r: float) -> None:
+    _draw_ball(p, c, r, QColor(240, 150, 110), QColor(180, 75, 45), QColor(60, 20, 12))
+
+
+def draw_gas_giant(p: QPainter, c: QPointF, r: float) -> None:
+    """Banded tan giant."""
+    _draw_ball(p, c, r, QColor(245, 225, 190), QColor(200, 155, 105), QColor(70, 45, 30))
+    if r < 6:
+        return
+    p.save()
+    clip = QPainterPath()
+    clip.addEllipse(c, r, r)
+    p.setClipPath(clip)
+    for i, (dy, w) in enumerate(((-0.45, 0.10), (-0.12, 0.14), (0.22, 0.09), (0.5, 0.07))):
+        band = QColor(150, 100, 65, 110) if i % 2 == 0 else QColor(235, 205, 160, 90)
+        p.fillRect(QRectF(c.x() - r, c.y() + dy * r, 2 * r, w * r), band)
+    p.restore()
+
+
+def draw_body(p: QPainter, name: str, c: QPointF, r: float) -> None:
+    """Draw the body called ``name`` (see game.py) with radius ``r`` px."""
+    {
+        "sun": draw_sun,
+        "planet": draw_planet,
+        "moon": draw_moon,
+        "red": draw_red_planet,
+        "giant": draw_gas_giant,
+    }.get(name, draw_moon)(p, c, r)
 
 
 def draw_ship(p: QPainter, pos: QPointF, heading: float, *, thrust: str | None = None,

@@ -9,7 +9,7 @@ import traceback
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
 
-from .game import MOON_MODE
+from .game import MOON_MODE, SOLAR
 from .menu import MenuWidget
 from .view import GameWidget
 
@@ -60,7 +60,8 @@ def main() -> int:
 
 
 def smoke_test(app: QApplication, win: MainWindow) -> None:
-    """Start a Lunar Transfer game, go back to the menu and quit.
+    """Start a Lunar Transfer game, then a Solar System game at high time
+    warp, go back to the menu and quit.
 
     PySide reports exceptions raised in Qt callbacks through sys.excepthook
     and then keeps running, so the hook turns any error into exit code 1.
@@ -70,7 +71,12 @@ def smoke_test(app: QApplication, win: MainWindow) -> None:
         app.exit(1)
 
     sys.excepthook = fail
+    def solar() -> None:
+        win.start_game(SOLAR)
+        win.game.game.set_warp(1000.0)
+
     QTimer.singleShot(500, lambda: win.start_game(MOON_MODE))
+    QTimer.singleShot(1000, solar)
     QTimer.singleShot(1500, win.show_menu)
     QTimer.singleShot(2000, lambda: app.exit(0))
 

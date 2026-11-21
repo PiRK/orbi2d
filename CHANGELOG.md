@@ -7,6 +7,18 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+- Solar System mode: a compressed solar system (Sun, the blue planet and its
+  moon, a red planet, a gas giant). Start around the blue planet, reach a
+  target orbit around the Sun or the gas giant. Gravity assists work
+  naturally through the patched conics.
+- Physics generalised to a tree of bodies, with SOI crossings at any depth.
+- Prediction of the next 3 SOI crossings, each with the orbit that follows.
+- Automatic time warp in Solar System mode (requested warp up to x1000 is a
+  ceiling; limited by orbit period, the next predicted crossing, and engine
+  burns), and a camera that follows the orbited body with log-scale zoom.
+- The CI smoke test also opens a Solar System game at high warp.
+
 ## [0.2.1] - 2026-11-20
 
 ### Added

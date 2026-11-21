@@ -12,6 +12,9 @@ Pick a mode on the start screen:
 - **Lunar Transfer**: a moon circles the planet. You start around one of them
   and the target orbit is around the other, so you have to fly from the
   planet to the moon or from the moon back to the planet.
+- **Solar System**: a compressed solar system with the Sun, the blue planet
+  and its moon, a red planet and a gas giant. You start around the blue
+  planet; the target orbit is around the Sun or the gas giant.
 
 This started as a vibe-coding project. The first few prompts are documented
 for posterity in [claude_session.txt](https://github.com/PiRK/orbi2d/blob/master/claude_session.txt).
@@ -55,7 +58,7 @@ on. The app icon is drawn by `packaging/make_icon.py`.
 | + / −          | Time warp ×1.25 / ÷1.25 (range ×0.1 – ×16)       |
 | P              | Pause                                            |
 | R / N          | New random level (Enter also works after a game ends) |
-| V              | Lunar Transfer: toggle the whole-system view     |
+| V              | Lunar Transfer / Solar System: toggle the whole-system view |
 | H              | Toggle help                                      |
 | Esc            | Back to the start screen (Esc there quits)       |
 
@@ -87,6 +90,23 @@ makes burns finer: at ×0.25 a tap on Space changes your speed 4× less.
   for a planet target, it zooms in on the planet as soon as your orbit can't
   reach the moon any more. Press V for the whole system.
 
+## Solar System mode
+
+- Distances are compressed (the gas giant is ~270x farther from the Sun than
+  the moon is from the blue planet, not ~23,000x as in reality), so the whole
+  system stays playable.
+- **Time warp adjusts itself.** Your setting (up to x1000, keys 1-9 or +/-)
+  is a ceiling: the game runs at most 3 orbits per real second, slows down
+  as the next sphere-of-influence crossing approaches, and stays at x8 or
+  below while the engine fires. The HUD shows both, e.g.
+  `Time warp x1000 (auto x70)`.
+- **Prediction looks 3 crossings ahead**: leaving the blue planet, meeting
+  the gas giant, leaving it again... each with the orbit that follows. A
+  flyby changes your orbit around the Sun: that's a gravity assist
+  (slingshot), and the prediction shows its effect before you get there.
+- The camera follows the body you are orbiting and zooms on a log scale;
+  V shows the whole system.
+
 ## Physics
 
 - The rocket and planet form a two-body Kepler system. Coasting uses the
@@ -99,10 +119,13 @@ makes burns finer: at ×0.25 a tap on Space changes your speed 4× less.
   So a burn in any direction at any point of the orbit changes the orbit the
   way it would in reality. For example, a prograde burn at one apsis raises the
   other apsis, and a radial burn rotates the line of apsides.
-- In Lunar Transfer mode the game uses *patched conics*: each body has a
-  sphere of influence, `r_SOI = d · (m_moon / m_planet)^0.4`. When the rocket
-  crosses its edge, the position and velocity are converted to the other
-  body's frame and the rocket continues on an exact conic around that body.
+- In Lunar Transfer and Solar System modes the game uses *patched conics*:
+  the bodies form a tree (Sun → planets → moons) and each one has a sphere of
+  influence, `r_SOI = d · (m_body / m_parent)^0.4`. When the rocket crosses
+  an edge, the position and velocity are converted to the other body's frame
+  and the rocket continues on an exact conic around that body. While coasting
+  at high warp, the game jumps straight to the next possible crossing, so
+  even x1000 stays cheap and exact.
 - You win when the engine is off, you are orbiting the target's body, and your
   orbit is within the tolerance of the target. Only the shape of the orbit counts, not the direction of travel.
   You lose if you hit the planet or escape.

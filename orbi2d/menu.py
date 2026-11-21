@@ -48,6 +48,7 @@ class MenuItem:
 ITEMS = (
     MenuItem("Planetary Orbit", "Match a target orbit around the planet", g.SINGLE),
     MenuItem("Lunar Transfer", "Fly between the planet and its moon", g.MOON_MODE),
+    MenuItem("Solar System", "Leave the blue planet for the Sun or a gas giant", g.SOLAR),
     MenuItem("Quit", "Close the game", None),
 )
 
