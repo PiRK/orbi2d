@@ -7,16 +7,14 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-### Changed
-- Leaving a game (Esc, controller Back) or starting a new orbit (R / N)
-  during a flight now asks for confirmation, with time stopped: Enter / A
-  for yes, Esc / B for no. After a win or a crash they act right away.
+## [0.4.0] - 2026-11-22
 
 ### Added
-- Solar System mode: planets and moons are lit by the Sun (bright side
-  towards it, shaded night side), so the Sun's direction is visible even
-  when zoomed in on a planet. Other modes and the start screen keep their
-  look.
+- Game controller support (SDL2 via PySDL2): D-pad or left stick to rotate,
+  A full thrust, B 10% thrust, LB/RB time warp, Y system view, Start pause,
+  Back to the start screen; up/down and A on the start screen. Controllers
+  can be plugged in at any time; the keyboard keeps working. Without SDL2
+  the game stays keyboard-only.
 - Solar System mode: two target orbits in every level, around the gas giant
   (easy to reach, expensive) and around the small red planet (cheap, much
   harder: tiny SOI, small fast orbits, capture needs early braking).
@@ -24,13 +22,18 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   switches the selected target, which the transfer window, closest-approach
   hints and HUD follow; arriving in a target planet's SOI selects it. The
   win screen says which target was reached.
-- Game controller support (SDL2 via PySDL2): D-pad or left stick to rotate,
-  A full thrust, B 10% thrust, LB/RB time warp, Y system view,
-  Start pause, Back to the start screen; up/down and A on the start screen.
-  Controllers can be plugged in at any time; the keyboard keeps working.
-  Without SDL2 the game stays keyboard-only.
+- Solar System mode: planets and moons are lit by the Sun (bright side
+  towards it, shaded night side), so the Sun's direction is visible even
+  when zoomed in on a planet. Other modes and the start screen keep their
+  look.
 - The self-test (and the CI smoke test of the standalone builds) plugs in a
-  virtual controller and fires the engine with it.
+  virtual controller and fires the engine with it; with ORBI2D_SMOKE_LOG it
+  logs its steps to a file.
+
+### Changed
+- Leaving a game (Esc, controller Back) or starting a new orbit (R / N)
+  during a flight now asks for confirmation, with time stopped: Enter / A
+  for yes, Esc / B for no. After a win or a crash they act right away.
 
 ## [0.3.0] - 2026-11-21
 
@@ -110,7 +113,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   the game starts at ×0.5.
 - MIT license.
 
-[Unreleased]: https://github.com/PiRK/orbi2d/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/PiRK/orbi2d/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/PiRK/orbi2d/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/PiRK/orbi2d/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/PiRK/orbi2d/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PiRK/orbi2d/compare/v0.1.0...v0.2.0
