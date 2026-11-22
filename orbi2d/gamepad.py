@@ -18,12 +18,14 @@ import ctypes
 import warnings
 from dataclasses import dataclass, field
 
+IMPORT_ERROR = ""
 try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")   # pysdl2-dll announces itself
         import sdl2
-except Exception:   # missing package or SDL2 library: keyboard only
+except Exception as exc:   # missing package or SDL2 library: keyboard only
     sdl2 = None
+    IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 
 STICK_THRESHOLD = 0.5   # left stick deflection that counts as a direction
 
@@ -59,6 +61,7 @@ class PadState:
 class Gamepad:
     def __init__(self) -> None:
         self.available = False
+        self.error = IMPORT_ERROR   # why it isn't available (diagnostics)
         self.controller = None
         self.name = ""
         self._prev: set[str] = set()
@@ -67,6 +70,7 @@ class Gamepad:
         # Keep reading the controller when the window isn't focused.
         sdl2.SDL_SetHint(sdl2.SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, b"1")
         if sdl2.SDL_Init(sdl2.SDL_INIT_GAMECONTROLLER) != 0:
+            self.error = "SDL_Init: " + sdl2.SDL_GetError().decode(errors="replace")
             return
         # We poll the state instead of reading SDL's event queue.
         sdl2.SDL_GameControllerEventState(sdl2.SDL_IGNORE)

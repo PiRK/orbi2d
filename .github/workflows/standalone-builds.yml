@@ -74,11 +74,14 @@ jobs:
         env:
           ORBI2D_SMOKE_TEST: "1"
           ORBI2D_SMOKE_PAD: "1"            # controller support must be bundled
+          ORBI2D_SMOKE_LOG: smoke.log      # the .exe has no console
         run: |
           $exe = (Get-Item dist\*.exe).FullName
           $p = Start-Process -FilePath $exe -PassThru
           $null = $p.Handle  # keep the handle so ExitCode is available
-          if (-not $p.WaitForExit(120000)) {
+          $finished = $p.WaitForExit(120000)
+          if (Test-Path smoke.log) { Get-Content smoke.log }
+          if (-not $finished) {
             Stop-Process -Id $p.Id -Force
             throw "smoke test timed out (error dialog or hang)"
           }
