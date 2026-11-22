@@ -349,3 +349,64 @@ def test_hint_burn_direction_leads_to_an_encounter():
         for _ in range(6):
             gm.update(1 / 30, Controls(thrust=True, fine=True))
     assert _encounter(gm)
+
+
+# ---- two targets: the gas giant (easy) or the red planet (hard) ----------
+
+def test_every_level_has_both_targets():
+    red = solar().bodies[RED]
+    for seed in range(20):
+        gm = solar(seed)
+        assert set(gm.targets) == {GIANT, RED}
+        assert gm.target_body == GIANT and gm.target is gm.targets[GIANT]
+        t = gm.targets[RED]
+        assert red.radius < t.periapsis <= t.apoapsis < red.soi
+
+
+def test_other_modes_have_a_single_target():
+    for mode in (g.SINGLE, g.MOON_MODE):
+        gm = Game(seed=1, mode=mode)
+        assert list(gm.targets) == [gm.target_body]
+
+
+def test_switching_target_moves_the_aids():
+    gm = solar(1)
+    giant_window = gm.transfer_window()
+    gm.cycle_target()
+    assert gm.target_body == RED and gm.target is gm.targets[RED]
+    phase, ideal, wait = gm.transfer_window()
+    assert ideal != pytest.approx(giant_window[1])        # Hohmann angle for the red planet
+    r1, r2 = g.HOME_DISTANCE, g.RED_DISTANCE
+    assert ideal == pytest.approx(180 * (1 - ((r1 + r2) / (2 * r2)) ** 1.5))
+    gm.cycle_target()
+    assert gm.target_body == GIANT
+
+
+@pytest.mark.parametrize("body", [GIANT, RED])
+def test_either_target_wins_whichever_is_selected(body):
+    gm = solar(4)
+    gm.select_target(GIANT)
+    gm.primary = body
+    gm.r, gm.v = state_on_orbit(gm.targets[body], 1.0, gm.mu_of(body))
+    gm.update(1 / 60, Controls())
+    assert gm.status == "won" and gm.reached == body
+
+
+def test_arriving_at_the_other_target_selects_it():
+    gm = solar(4)
+    red = gm.bodies[RED]
+    assert gm.target_body == GIANT
+    # Just outside the red planet's SOI, heading straight in.
+    rx, ry = gm.body_position(RED)
+    vx, vy = gm.body_velocity(RED)
+    gm.primary = SUN
+    gm.r = (rx + red.soi + 2.0, ry)
+    gm.v = (vx - 40.0, vy)
+    gm._refresh_orbit()
+    gm.set_warp(1.0)
+    for _ in range(60):
+        gm.update(1 / 60, Controls())
+        if gm.primary == RED:
+            break
+    assert gm.primary == RED and gm.target_body == RED
+    assert gm.target is gm.targets[RED]   # HUD and aids now follow the red target

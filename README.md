@@ -14,7 +14,9 @@ Pick a mode on the start screen:
   planet to the moon or from the moon back to the planet.
 - **Solar System**: a compressed solar system with the Sun, the blue planet
   and its moon, a red planet and a gas giant. You start around the blue
-  planet; the target orbit is around the gas giant.
+  planet, with two target orbits to choose from: around the gas giant (easy
+  to reach but expensive) or around the small red planet (cheap, but a much
+  harder target). Reaching either one wins.
 
 This started as a vibe-coding project. The first few prompts are documented
 for posterity in [claude_session.txt](https://github.com/PiRK/orbi2d/blob/master/claude_session.txt).
@@ -109,6 +111,13 @@ makes burns finer: at ×0.25 a tap on Space changes your speed 4× less.
 
 ## Solar System mode
 
+- **Two targets.** Tab (or the controller's D-pad ▲/▼) switches the
+  selected target; the transfer window, the closest-approach hints and the
+  HUD follow it, and arriving in a target planet's SOI selects it. The red
+  planet's SOI is tiny (729 units, vs 40,300 for the gas giant), so expect
+  mid-course corrections; its target orbits are small and fast (a few
+  seconds per orbit), so use slow motion; and the pass by the planet is too
+  short for a capture burn: start braking as soon as you enter its SOI.
 - Distances are compressed (the gas giant is ~270x farther from the Sun than
   the moon is from the blue planet, not ~23,000x as in reality), so the whole
   system stays playable.

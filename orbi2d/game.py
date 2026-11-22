@@ -9,8 +9,10 @@ Three modes:
 * ``moon``: a planet and a moon on a circular orbit around it.  The start
   orbit is around one body and the target orbit around the other.
 * ``solar``: a compressed solar system (Sun, the blue planet and its moon, a
-  red planet, a gas giant).  The start orbit is around the blue planet and
-  the target orbit around the gas giant.
+  red planet, a gas giant).  The start orbit is around the blue planet; there
+  are two target orbits, one around the gas giant (easy to reach, expensive)
+  and one around the small red planet (cheap, but a much harder target).
+  Reaching either one wins.
 
 Bodies form a tree (Sun -> planets -> moons); every body except the root
 moves on a circular, counter-clockwise orbit around its parent.  Gravity uses
@@ -258,8 +260,9 @@ class Game:
     primary: str = PLANET
     heading: float = 0.0           # direction the nose points (rad)
     orbit: Orbit = field(default=None)  # type: ignore[assignment]
-    target: Orbit = field(default=None)  # type: ignore[assignment]
-    target_body: str = PLANET
+    target_body: str = PLANET      # the selected target (aids and HUD follow it)
+    targets: dict[str, Orbit] = field(default_factory=dict)   # body -> target orbit
+    reached: str | None = None     # target body whose orbit was matched
     bodies: dict[str, Body] = field(default_factory=dict)
     root: str = PLANET
     moon: Body | None = None
@@ -366,9 +369,16 @@ class Game:
             self.target_body = GIANT
             giant = self.bodies[GIANT]
             target = _orbit_between(rng, 1.6 * giant.radius, 0.08 * giant.soi, 0.2 * giant.soi)
+        self.targets = {}
         self.target = target
         self.primary = start_body
         self.r, self.v = state_on_orbit(start, rng.uniform(0, 2 * math.pi), self.mu_of(start_body))
+        if self.mode == SOLAR:
+            # Second target, around the red planet (drawn last, so the rest
+            # of each level is the same as with the gas giant alone).
+            red = self.bodies[RED]
+            self.targets[RED] = _orbit_between(rng, 1.6 * red.radius, 0.1 * red.soi, 0.2 * red.soi)
+        self.reached = None
         self.heading = math.atan2(self.v[1], self.v[0])  # start pointing prograde
         self.status = "playing"
         self.thrusting = False
@@ -413,10 +423,34 @@ class Game:
     def slower(self) -> None:
         self.set_warp(self.time_warp / WARP_STEP)
 
+    @property
+    def target(self) -> Orbit:
+        """The selected target orbit (around ``target_body``)."""
+        return self.targets[self.target_body]
+
+    @target.setter
+    def target(self, orbit: Orbit) -> None:
+        self.targets[self.target_body] = orbit
+
+    def select_target(self, body: str) -> None:
+        """Choose which target the aids (window, closest approach) and the
+        HUD follow. Reaching any target wins."""
+        if body in self.targets:
+            self.target_body = body
+            if self.status == "playing":
+                self._refresh_orbit()
+                self._predict()
+
+    def cycle_target(self) -> None:
+        names = list(self.targets)
+        self.select_target(names[(names.index(self.target_body) + 1) % len(names)])
+
     def _refresh_orbit(self) -> None:
         self.orbit = Orbit.from_state(self.r, self.v, self.mu_of(self.primary))
-        if self.primary == self.target_body:
-            self.deviation = self.orbit.deviation_from(self.target)
+        # Progress towards the target around the body being orbited, if any.
+        target = self.targets.get(self.primary)
+        if target is not None:
+            self.deviation = self.orbit.deviation_from(target)
         else:
             self.deviation = math.inf
 
@@ -787,6 +821,9 @@ class Game:
         else:
             switched = self._advance(t, sim_dt, accel)
 
+        if switched and self.primary in self.targets and self.primary != self.target_body:
+            # Arrived at the other target: it becomes the selected one.
+            self.target_body = self.primary
         self._refresh_orbit()
         if self.status != "playing":
             self.transitions, self.approaches = [], []
@@ -796,6 +833,7 @@ class Game:
             self.transitions, self.approaches = [], []
         elif not self.thrusting and self.deviation <= self.tolerance:
             self.status = "won"
+            self.reached = self.primary
             self.transitions, self.approaches = [], []
         elif self._needs_prediction(switched):
             self._predict()

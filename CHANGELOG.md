@@ -8,6 +8,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ## [Unreleased]
 
 ### Added
+- Solar System mode: two target orbits in every level, around the gas giant
+  (easy to reach, expensive) and around the small red planet (cheap, much
+  harder: tiny SOI, small fast orbits, capture needs early braking).
+  Reaching either one wins; Tab / T or the controller's D-pad up/down
+  switches the selected target, which the transfer window, closest-approach
+  hints and HUD follow; arriving in a target planet's SOI selects it. The
+  win screen says which target was reached.
 - Game controller support (SDL2 via PySDL2): D-pad or left stick to rotate,
   A full thrust, B 10% thrust, LB/RB time warp, Y system view, X new orbit,
   Start pause, Back to the start screen; up/down and A on the start screen.

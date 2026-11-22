@@ -219,6 +219,8 @@ class GameWidget(QWidget):
             gm.slower()
         if "rb" in pressed:
             gm.faster()
+        if pressed & {"up", "down"} and len(gm.targets) > 1:
+            gm.cycle_target()
         if "y" in pressed:
             self.system_view = not self.system_view
         if "start" in pressed:
@@ -283,6 +285,8 @@ class GameWidget(QWidget):
             and gm.status != "playing"
         ):
             self.new_level()
+        elif key in (Qt.Key.Key_Tab, Qt.Key.Key_T) and len(gm.targets) > 1:
+            gm.cycle_target()
         elif key == Qt.Key.Key_V:
             self.system_view = not self.system_view
         elif key == Qt.Key.Key_P:
@@ -305,6 +309,9 @@ class GameWidget(QWidget):
             return
         if not self._set_key(event, False):
             super().keyReleaseEvent(event)
+
+    def focusNextPrevChild(self, next: bool) -> bool:  # noqa: N802
+        return False   # Tab switches targets instead of moving the focus
 
     def focusOutEvent(self, event) -> None:  # noqa: N802
         # Don't leave the engine stuck on when the window loses focus.
@@ -396,9 +403,13 @@ class GameWidget(QWidget):
 
         matched = gm.deviation <= gm.tolerance
         target_center = gm.body_position(gm.target_body)
-        self._draw_orbit(p, gm.target, TARGET_COLOR, dashed=True,
-                         width=2.0 if not matched else 3.0, center=target_center,
-                         clip=self._clip_for(gm.target_body))
+        other = QColor(TARGET_COLOR)
+        other.setAlpha(110)
+        for body, orbit in gm.targets.items():
+            selected = body == gm.target_body
+            self._draw_orbit(p, orbit, TARGET_COLOR if selected else other, dashed=True,
+                             width=(3.0 if matched else 2.0) if selected else 1.3,
+                             center=gm.body_position(body), clip=self._clip_for(body))
         for i, tr in enumerate(gm.transitions):
             self._draw_solar_transition(p, tr, alpha=255 - 60 * i)
         self._draw_approaches(p)
@@ -643,11 +654,17 @@ class GameWidget(QWidget):
             (TEXT_COLOR, f"Δv used  {gm.burn_dv:7.1f}   Time  {gm.elapsed:6.1f}s"),
             (TEXT_COLOR, ""),
         ]
-        if moon_mode:
+        if solar:   # the selected target has its own line below
+            lines.insert(2, (TEXT_COLOR, f"Orbiting {gm.label(gm.primary)}"))
+        elif moon_mode:
             lines.insert(2, (TEXT_COLOR, f"Orbiting {gm.label(gm.primary):7}   "
                                          f"Target around {gm.label(gm.target_body)}"))
         if solar:
             extra = []
+            if len(gm.targets) > 1:
+                others = [gm.label(b) for b in gm.targets if b != gm.target_body]
+                extra.append((TARGET_COLOR, f"Selected target: {gm.label(gm.target_body)}   "
+                                            f"(Tab: {', '.join(others)})"))
             window = gm.transfer_window()
             if window is not None and gm.primary == g.PLANET:
                 phase, ideal, wait = window
@@ -743,13 +760,15 @@ class GameWidget(QWidget):
             help_lines = [
                 "←/→ rotate   Space (or ↑) main engine   Shift fine control",
                 f"1-{len(gm.warp_presets)} or +/- time warp   P pause   R new orbit"
-                + ("   V system view" if moon_mode else ""),
+                + ("   V system view" if moon_mode else "")
+                + ("   Tab switch target" if len(gm.targets) > 1 else ""),
                 "H hide help   Esc main menu",
             ]
             if self.pad is not None and self.pad.connected:
                 help_lines.append(
                     f"{self.pad.name}: ◀▶ rotate   A thrust   B fine thrust   LB/RB warp   "
                     + ("Y system view   " if moon_mode else "")
+                    + ("▲▼ switch target   " if len(gm.targets) > 1 else "")
                     + "X new orbit   Start pause   Back menu")
             p.setFont(QFont("monospace", 9))
             p.setPen(DIM_TEXT)
@@ -771,6 +790,8 @@ class GameWidget(QWidget):
             f"Δv {gm.burn_dv:.1f}   time {gm.elapsed:.1f}s   deviation {100 * gm.deviation:.2f}%"
             if gm.status == "won" else ""
         )
+        if sub and gm.mode == g.SOLAR and gm.reached:
+            sub = f"Orbit around the {gm.label(gm.reached)}   " + sub
         if sub and gm.mode == g.SOLAR and gm.assists:
             sub += f"   gravity assists +{gm.assist_dv:.1f} Δv"
         rect = QRectF(0, self.height() * 0.18, self.width(), 50)

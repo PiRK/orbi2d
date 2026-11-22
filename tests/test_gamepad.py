@@ -179,3 +179,17 @@ def test_unplug_and_plug_back_in(app):
     assert gp.connected
     gp.close()
     vp2.unplug()
+
+
+def test_dpad_up_down_switch_solar_targets(app, pad):
+    gp, vp = pad
+    w = GameWidget(seed=1, mode=g.SOLAR)
+    w.timer.stop()
+    w.pad = gp
+    w.apply_pad(gp.poll())
+    assert w.game.target_body == g.GIANT
+    _press(w, gp, vp, "down")
+    assert w.game.target_body == g.RED
+    _press(w, gp, vp, "down", down=False)
+    _press(w, gp, vp, "up")
+    assert w.game.target_body == g.GIANT
