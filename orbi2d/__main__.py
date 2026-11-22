@@ -101,8 +101,10 @@ def smoke_log(msg: str) -> None:
 
 
 def smoke_test(app: QApplication, win: MainWindow) -> None:
-    """Start a Lunar Transfer game, then a Solar System game at high time
-    warp, go back to the menu and quit.
+    """Start a Lunar Transfer game (fire the engine with a virtual
+    controller if possible), then a Solar System game at high time warp, go
+    back to the menu and quit. Each step waits for the previous one to have
+    really happened (slow machines start slowly), not for a fixed time.
 
     PySide reports exceptions raised in Qt callbacks through sys.excepthook
     and then keeps running, so the hook turns any error into exit code 1.
@@ -116,20 +118,79 @@ def smoke_test(app: QApplication, win: MainWindow) -> None:
         traceback.print_exception(exc_type, exc, tb)
         app.exit(1)
 
+    sys.excepthook = fail
+
+    def after(ms: int, step) -> None:
+        QTimer.singleShot(ms, step)
+
+    def moon() -> None:
+        win.start_game(MOON_MODE)
+        smoke_log("Lunar Transfer game started")
+        after(50, lambda: smoke_test_controller(app, win, then=solar))
+
+    def solar() -> None:
+        win.start_game(SOLAR)
+        win.game.game.set_warp(1000.0)
+        smoke_log("Solar System game started at x1000")
+        after(500, menu)
+
+    def menu() -> None:
+        win.show_menu()
+        after(500, done)
+
     def done() -> None:
         smoke_log("passed")
         app.exit(0)
 
-    sys.excepthook = fail
-    def solar() -> None:
-        win.start_game(SOLAR)
-        win.game.game.set_warp(1000.0)
+    after(500, moon)
 
-    QTimer.singleShot(500, lambda: win.start_game(MOON_MODE))
-    smoke_test_controller(app, win)
-    QTimer.singleShot(1000, solar)
-    QTimer.singleShot(1500, win.show_menu)
-    QTimer.singleShot(2000, done)
+
+def smoke_test_controller(app: QApplication, win: MainWindow, then) -> None:
+    """Plug in a virtual controller, wait until the game is running, fire
+    the engine with A, check it fired, then continue with ``then``. With
+    ORBI2D_SMOKE_PAD=1 (CI builds), missing controller support fails."""
+    smoke_log(f"controller support available: {win.pad.available}"
+              + (f" ({win.pad.error})" if win.pad.error else ""))
+    if not win.pad.available:
+        if os.environ.get("ORBI2D_SMOKE_PAD") == "1":
+            smoke_log("FAILED: game controller support (SDL2) is missing")
+            app.exit(1)
+        else:
+            QTimer.singleShot(500, then)
+        return
+    from .gamepad import VirtualPad
+
+    pad = VirtualPad("orbi2d smoke-test pad")
+    opened = win.pad.open(pad.index)
+    smoke_log(f"virtual controller at index {pad.index}, opened: {opened} ({win.pad.name!r})")
+    view = win.game
+    tries = [0]
+
+    def wait_for_game() -> None:
+        # The game must have run frames with A up, or A counts as "held
+        # since the menu" and is ignored until released (on purpose).
+        if view.game.elapsed > 0 and not view.pad_blocked:
+            pad.set("a", True)
+            smoke_log("A pressed")
+            QTimer.singleShot(300, check)
+        elif tries[0] < 200:
+            tries[0] += 1
+            QTimer.singleShot(50, wait_for_game)
+        else:
+            smoke_log("FAILED: the game never started running")
+            app.exit(1)
+
+    def check() -> None:
+        gm = view.game
+        smoke_log(f"after holding A: status={gm.status} burn_dv={gm.burn_dv:.2f}")
+        pad.set("a", False)
+        if gm.burn_dv <= 0:
+            smoke_log("FAILED: controller A did not fire the engine")
+            app.exit(1)
+            return
+        then()
+
+    wait_for_game()
 
 
 if __name__ == "__main__":
