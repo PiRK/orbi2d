@@ -11,7 +11,13 @@ license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "PiRK" }]
 requires-python = ">=3.10"
-dependencies = ["PySide6>=6.5"]
+dependencies = [
+    "PySide6>=6.5",
+    # Game controllers (SDL2). pysdl2-dll ships the SDL2 library; elsewhere
+    # PySDL2 uses a system SDL2 if there is one, else keyboard only.
+    "PySDL2>=0.9.16",
+    "pysdl2-dll>=2.30; sys_platform == 'win32' or sys_platform == 'darwin' or (sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64'))",
+]
 keywords = ["game", "orbital mechanics", "kepler", "physics", "qt"]
 classifiers = [
     "Development Status :: 4 - Beta",

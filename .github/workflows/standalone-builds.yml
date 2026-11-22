@@ -73,6 +73,7 @@ jobs:
         shell: pwsh
         env:
           ORBI2D_SMOKE_TEST: "1"
+          ORBI2D_SMOKE_PAD: "1"            # controller support must be bundled
         run: |
           $exe = (Get-Item dist\*.exe).FullName
           $p = Start-Process -FilePath $exe -PassThru
@@ -88,6 +89,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           ORBI2D_SMOKE_TEST: "1"
+          ORBI2D_SMOKE_PAD: "1"            # controller support must be bundled
           QT_QPA_PLATFORM: offscreen       # no display on the runner
           APPIMAGE_EXTRACT_AND_RUN: "1"    # no FUSE on the runner
         run: |

@@ -21,6 +21,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QWidget
 
 from . import game as g
+from .gamepad import Gamepad, PadState
 from .graphics import (
     BAD_COLOR,
     BG,
@@ -75,6 +76,7 @@ class GameWidget(QWidget):
         self.setMinimumSize(640, 480)
         self.show_help = True
         self.stars = make_stars()
+        self.pad: Gamepad | None = None   # set by the main window
         self.clock = QElapsedTimer()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
@@ -85,8 +87,12 @@ class GameWidget(QWidget):
         warp = self.game.time_warp if hasattr(self, "game") else g.DEFAULT_WARP
         self.game = g.Game(seed=seed, mode=mode)
         self.game.set_warp(warp)
-        self.controls = g.Controls()
+        self.controls = g.Controls()       # what the game gets: keyboard + controller
+        self.key_controls = g.Controls()   # from the keyboard
         self.thrust_keys: set[int] = set()  # held engine keys (Space, Up)
+        # Controller buttons still held from the menu (A starts a game) must
+        # be released once before they count, or the engine would fire.
+        self.pad_blocked = {"a", "b"}
         self.paused = False
         self.system_view = False   # moon mode: force the whole-system camera
         # Camera: ``focus`` blends the view centre from the planet (0) to the
@@ -114,6 +120,7 @@ class GameWidget(QWidget):
     # ---- loop ------------------------------------------------------------
     def _tick(self) -> None:
         dt = min(self.clock.restart() / 1000.0, 0.05)
+        self.apply_pad(self.pad.poll() if self.pad else PadState())
         if not self.paused:
             self.game.update(dt, self.controls)
         self.step_camera(dt)
@@ -198,23 +205,70 @@ class GameWidget(QWidget):
         return body.name, 1.15 * body.soi   # leaving: show the whole SOI
 
     # ---- input -----------------------------------------------------------
+    def apply_pad(self, pad: PadState) -> None:
+        """Controller: held buttons steer and fire the engine (combined with
+        the keyboard), pressed buttons trigger actions."""
+        # Actions first: a new level blocks the button that started it.
+        gm = self.game
+        pressed = pad.pressed
+        if "a" in pressed and gm.status != "playing":
+            self.new_level()
+        if "x" in pressed:
+            self.new_level()
+        if "lb" in pressed:
+            gm.slower()
+        if "rb" in pressed:
+            gm.faster()
+        if "y" in pressed:
+            self.system_view = not self.system_view
+        if "start" in pressed:
+            self.paused = not self.paused
+        if "back" in pressed:
+            self.leave()
+        self.pad_blocked &= pad.held   # released once: usable again
+        held = pad.held - self.pad_blocked
+        k = self.key_controls
+        full, fine = "a" in held, "b" in held
+        self.controls = g.Controls(
+            left=k.left or "left" in held,
+            right=k.right or "right" in held,
+            thrust=k.thrust or full or fine,
+            # B: 10% thrust (and fine turning, like Shift); A wins over B.
+            fine=k.fine or (fine and not full),
+        )
+
+    def new_level(self) -> None:
+        self.game.reset()
+        self.paused = False
+        self.pad_blocked = {"a", "b"}
+
+    def leave(self) -> None:
+        """Back to the main menu."""
+        self.key_controls = g.Controls()
+        self.controls = g.Controls()
+        self.thrust_keys.clear()
+        self.exit_requested.emit()
+
     def _set_key(self, event: QKeyEvent, pressed: bool) -> bool:
         key = event.key()
+        k = self.key_controls
         if key == Qt.Key.Key_Left:
-            self.controls.left = pressed
+            k.left = pressed
         elif key == Qt.Key.Key_Right:
-            self.controls.right = pressed
+            k.right = pressed
         elif key in THRUST_KEYS:
             # Either key fires the engine; it stays on while any is held.
             if pressed:
                 self.thrust_keys.add(key)
             else:
                 self.thrust_keys.discard(key)
-            self.controls.thrust = bool(self.thrust_keys)
+            k.thrust = bool(self.thrust_keys)
         elif key == Qt.Key.Key_Shift:
-            self.controls.fine = pressed
+            k.fine = pressed
         else:
             return False
+        # Keyboard-only play still works when no timer tick merges inputs.
+        self.controls = g.Controls(k.left, k.right, k.thrust, k.fine)
         return True
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
@@ -228,8 +282,7 @@ class GameWidget(QWidget):
             key in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
             and gm.status != "playing"
         ):
-            gm.reset()
-            self.paused = False
+            self.new_level()
         elif key == Qt.Key.Key_V:
             self.system_view = not self.system_view
         elif key == Qt.Key.Key_P:
@@ -243,9 +296,7 @@ class GameWidget(QWidget):
         elif key in (Qt.Key.Key_Minus, Qt.Key.Key_Underscore):
             gm.slower()
         elif key == Qt.Key.Key_Escape:
-            self.controls = g.Controls()
-            self.thrust_keys.clear()
-            self.exit_requested.emit()
+            self.leave()
         else:
             super().keyPressEvent(event)
 
@@ -257,6 +308,7 @@ class GameWidget(QWidget):
 
     def focusOutEvent(self, event) -> None:  # noqa: N802
         # Don't leave the engine stuck on when the window loses focus.
+        self.key_controls = g.Controls()
         self.controls = g.Controls()
         self.thrust_keys.clear()
         super().focusOutEvent(event)
@@ -694,6 +746,11 @@ class GameWidget(QWidget):
                 + ("   V system view" if moon_mode else ""),
                 "H hide help   Esc main menu",
             ]
+            if self.pad is not None and self.pad.connected:
+                help_lines.append(
+                    f"{self.pad.name}: ◀▶ rotate   A thrust   B fine thrust   LB/RB warp   "
+                    + ("Y system view   " if moon_mode else "")
+                    + "X new orbit   Start pause   Back menu")
             p.setFont(QFont("monospace", 9))
             p.setPen(DIM_TEXT)
             y = self.height() - 12 - 15 * (len(help_lines) - 1)

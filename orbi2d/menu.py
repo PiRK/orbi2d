@@ -22,6 +22,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QWidget
 
 from . import game as g
+from .gamepad import Gamepad, PadState
 from .graphics import (
     BG,
     CURRENT_COLOR,
@@ -74,6 +75,7 @@ class MenuWidget(QWidget):
         self.t = 0.0
         self.stars = make_stars()
         self._item_rects: list[QRectF] = []
+        self.pad: Gamepad | None = None   # set by the main window
         self._ship_state = g.state_on_orbit(SHIP_ORBIT, math.radians(200), g.MU)
         self.clock = QElapsedTimer()
         self.timer = QTimer(self)
@@ -91,6 +93,7 @@ class MenuWidget(QWidget):
 
     def _tick(self) -> None:
         self.t += min(self.clock.restart() / 1000.0, 0.05)
+        self.apply_pad(self.pad.poll() if self.pad else PadState())
         self.update()
 
     # ---- input -----------------------------------------------------------
@@ -121,6 +124,16 @@ class MenuWidget(QWidget):
             super().keyPressEvent(event)
             return
         self.update()
+
+    def apply_pad(self, pad: PadState) -> None:
+        """Controller: up/down to choose, A or Start to select."""
+        n = len(ITEMS)
+        if "up" in pad.pressed:
+            self.selected = (self.selected - 1) % n
+        if "down" in pad.pressed:
+            self.selected = (self.selected + 1) % n
+        if pad.pressed & {"a", "start"}:
+            self.activate(self.selected)
 
     def _item_at(self, pos: QPointF) -> int | None:
         for i, rect in enumerate(self._item_rects):
@@ -273,3 +286,7 @@ class MenuWidget(QWidget):
         p.setPen(DIM_TEXT)
         p.drawText(QPointF(self._left(), self.height() - 18),
                    "↑/↓ choose    Enter start    Esc quit")
+        if self.pad is not None and self.pad.connected:
+            text = f"{self.pad.name} connected: ↑/↓ choose, A start"
+            w = p.fontMetrics().horizontalAdvance(text)
+            p.drawText(QPointF(self.width() - w - 18, self.height() - 18), text)

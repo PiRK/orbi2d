@@ -7,6 +7,15 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+- Game controller support (SDL2 via PySDL2): D-pad or left stick to rotate,
+  A full thrust, B 10% thrust, LB/RB time warp, Y system view, X new orbit,
+  Start pause, Back to the start screen; up/down and A on the start screen.
+  Controllers can be plugged in at any time; the keyboard keeps working.
+  Without SDL2 the game stays keyboard-only.
+- The self-test (and the CI smoke test of the standalone builds) plugs in a
+  virtual controller and fires the engine with it.
+
 ## [0.3.0] - 2026-11-21
 
 ### Added

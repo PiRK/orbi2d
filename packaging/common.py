@@ -41,6 +41,8 @@ def pyinstaller(name: str, *, onefile: bool, icon: Path, distpath: Path) -> None
         "--icon", icon,
         "--paths", ROOT,                 # import orbi2d from the source tree
         "--exclude-module", "tkinter",
+        # PySDL2 loads the SDL2 library at run time: bundle pysdl2-dll's copy.
+        "--collect-all", "sdl2dll",
         "--distpath", distpath,
         "--workpath", work,
         "--specpath", work,

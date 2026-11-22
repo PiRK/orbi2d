@@ -62,6 +62,23 @@ on. The app icon is drawn by `packaging/make_icon.py`.
 | H              | Toggle help                                      |
 | Esc            | Back to the start screen (Esc there quits)       |
 
+### Game controller
+
+Xbox, PlayStation, Switch Pro, Logitech and most other controllers work
+(through SDL2's standard controller layout), plugged in before or during
+the game. The keyboard keeps working alongside.
+
+| Controller          | In game                                   | Start screen |
+|---------------------|-------------------------------------------|--------------|
+| D-pad / left stick  | ◀ ▶ rotate                                | ▲ ▼ choose   |
+| A                   | Full thrust (new orbit after a game ends) | Start        |
+| B                   | 10% thrust (and fine turning while held)  |              |
+| LB / RB             | Time warp − / +                           |              |
+| Y                   | Whole-system view                         |              |
+| X                   | New orbit                                 |              |
+| Start               | Pause                                     | Start        |
+| Back / View         | Back to the start screen                  |              |
+
 The yellow circle next to the ship marks the **prograde** direction (where the
 ship is moving). The red ✕ marks **retrograde**. Pe/Ap mark periapsis and
 apoapsis.
