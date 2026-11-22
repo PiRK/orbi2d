@@ -94,6 +94,7 @@ class GameWidget(QWidget):
         # be released once before they count, or the engine would fire.
         self.pad_blocked = {"a", "b"}
         self.paused = False
+        self.confirm: str | None = None   # "leave" / "new": waiting for a yes or no
         self.system_view = False   # moon mode: force the whole-system camera
         # Camera: ``focus`` blends the view centre from the planet (0) to the
         # moon (1); ``view_extent`` is the half-size of the view in world units.
@@ -121,7 +122,7 @@ class GameWidget(QWidget):
     def _tick(self) -> None:
         dt = min(self.clock.restart() / 1000.0, 0.05)
         self.apply_pad(self.pad.poll() if self.pad else PadState())
-        if not self.paused:
+        if not self.paused and self.confirm is None:
             self.game.update(dt, self.controls)
         self.step_camera(dt)
         self.update()
@@ -211,9 +212,14 @@ class GameWidget(QWidget):
         # Actions first: a new level blocks the button that started it.
         gm = self.game
         pressed = pad.pressed
+        if self.confirm is not None:   # only yes (A) or no (B) count
+            if "a" in pressed:
+                self.answer(True)
+            elif "b" in pressed:
+                self.answer(False)
+            self.controls = g.Controls()
+            return
         if "a" in pressed and gm.status != "playing":
-            self.new_level()
-        if "x" in pressed:
             self.new_level()
         if "lb" in pressed:
             gm.slower()
@@ -226,7 +232,7 @@ class GameWidget(QWidget):
         if "start" in pressed:
             self.paused = not self.paused
         if "back" in pressed:
-            self.leave()
+            self.ask("leave")
         self.pad_blocked &= pad.held   # released once: usable again
         held = pad.held - self.pad_blocked
         k = self.key_controls
@@ -238,6 +244,29 @@ class GameWidget(QWidget):
             # B: 10% thrust (and fine turning, like Shift); A wins over B.
             fine=k.fine or (fine and not full),
         )
+
+    def ask(self, action: str) -> None:
+        """Leaving or restarting during a flight loses it: stop time and
+        wait for a yes or no. Once the game is over, just do it."""
+        if self.game.status != "playing":
+            self._do(action)
+            return
+        self.confirm = action
+        self.key_controls = g.Controls()
+        self.controls = g.Controls()
+        self.thrust_keys.clear()
+
+    def answer(self, yes: bool) -> None:
+        action, self.confirm = self.confirm, None
+        self.pad_blocked = {"a", "b"}   # the answer button must not fire the engine
+        if yes and action:
+            self._do(action)
+
+    def _do(self, action: str) -> None:
+        if action == "leave":
+            self.leave()
+        else:
+            self.new_level()
 
     def new_level(self) -> None:
         self.game.reset()
@@ -274,16 +303,22 @@ class GameWidget(QWidget):
         return True
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+        if self.confirm is not None:   # only yes (Enter) or no (Esc) count
+            if not event.isAutoRepeat():
+                if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                    self.answer(True)
+                elif event.key() == Qt.Key.Key_Escape:
+                    self.answer(False)
+            return
         if self._set_key(event, True):
             return
         if event.isAutoRepeat():
             return
         key = event.key()
         gm = self.game
-        if key in (Qt.Key.Key_R, Qt.Key.Key_N) or (
-            key in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
-            and gm.status != "playing"
-        ):
+        if key in (Qt.Key.Key_R, Qt.Key.Key_N):
+            self.ask("new")
+        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and gm.status != "playing":
             self.new_level()
         elif key in (Qt.Key.Key_Tab, Qt.Key.Key_T) and len(gm.targets) > 1:
             gm.cycle_target()
@@ -300,7 +335,7 @@ class GameWidget(QWidget):
         elif key in (Qt.Key.Key_Minus, Qt.Key.Key_Underscore):
             gm.slower()
         elif key == Qt.Key.Key_Escape:
-            self.leave()
+            self.ask("leave")
         else:
             super().keyPressEvent(event)
 
@@ -380,6 +415,7 @@ class GameWidget(QWidget):
         self._draw_rocket(p)
         self._draw_hud(p)
         self._draw_banner(p)
+        self._draw_confirm(p)
         p.end()
 
     def _paint_solar(self, p: QPainter) -> None:
@@ -425,6 +461,7 @@ class GameWidget(QWidget):
         self._draw_rocket(p)
         self._draw_hud(p)
         self._draw_banner(p)
+        self._draw_confirm(p)
 
     def _solar_escaping(self) -> bool:
         """Around the Sun on an orbit that leaves the play area (open, or
@@ -777,13 +814,40 @@ class GameWidget(QWidget):
                     f"{self.pad.name}: ◀▶ rotate   A thrust   B fine thrust   LB/RB warp   "
                     + ("Y system view   " if moon_mode else "")
                     + ("▲▼ switch target   " if len(gm.targets) > 1 else "")
-                    + "X new orbit   Start pause   Back menu")
+                    + "Start pause   Back menu")
             p.setFont(QFont("monospace", 9))
             p.setPen(DIM_TEXT)
             y = self.height() - 12 - 15 * (len(help_lines) - 1)
             for text in help_lines:
                 p.drawText(14, y, text)
                 y += 15
+
+    def _draw_confirm(self, p: QPainter) -> None:
+        """The yes/no question, over the frozen game."""
+        if self.confirm is None:
+            return
+        w, h = self.width(), self.height()
+        shade = QColor(BG)
+        shade.setAlpha(150)
+        p.fillRect(self.rect(), shade)
+        box = QRectF(w / 2 - 230, h / 2 - 80, 460, 160)
+        fill = QColor(BG)
+        fill.setAlpha(240)
+        p.setPen(QPen(WARN_COLOR, 1.5))
+        p.setBrush(fill)
+        p.drawRoundedRect(box, 10, 10)
+        title = "Leave this game?" if self.confirm == "leave" else "Start a new orbit?"
+        p.setFont(QFont("sans-serif", 20, QFont.Weight.Bold))
+        p.setPen(WARN_COLOR)
+        p.drawText(QRectF(box.x(), box.y() + 18, box.width(), 36), Qt.AlignmentFlag.AlignCenter, title)
+        p.setFont(QFont("sans-serif", 11))
+        p.setPen(DIM_TEXT)
+        p.drawText(QRectF(box.x(), box.y() + 60, box.width(), 24), Qt.AlignmentFlag.AlignCenter,
+                   "The current flight will be lost. Time is stopped.")
+        p.setFont(QFont("monospace", 11))
+        p.setPen(TEXT_COLOR)
+        p.drawText(QRectF(box.x(), box.y() + 104, box.width(), 24), Qt.AlignmentFlag.AlignCenter,
+                   "Enter / A: yes        Esc / B: no")
 
     def _draw_banner(self, p: QPainter) -> None:
         gm = self.game

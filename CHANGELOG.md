@@ -7,6 +7,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+- Leaving a game (Esc, controller Back) or starting a new orbit (R / N)
+  during a flight now asks for confirmation, with time stopped: Enter / A
+  for yes, Esc / B for no. After a win or a crash they act right away.
+
 ### Added
 - Solar System mode: planets and moons are lit by the Sun (bright side
   towards it, shaded night side), so the Sun's direction is visible even
@@ -20,7 +25,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   hints and HUD follow; arriving in a target planet's SOI selects it. The
   win screen says which target was reached.
 - Game controller support (SDL2 via PySDL2): D-pad or left stick to rotate,
-  A full thrust, B 10% thrust, LB/RB time warp, Y system view, X new orbit,
+  A full thrust, B 10% thrust, LB/RB time warp, Y system view,
   Start pause, Back to the start screen; up/down and A on the start screen.
   Controllers can be plugged in at any time; the keyboard keeps working.
   Without SDL2 the game stays keyboard-only.

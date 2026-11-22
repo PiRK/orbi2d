@@ -59,10 +59,10 @@ on. The app icon is drawn by `packaging/make_icon.py`.
 | 1–6            | Time warp presets ×0.25 / ×0.5 / ×1 / ×2 / ×4 / ×8 |
 | + / −          | Time warp ×1.25 / ÷1.25 (range ×0.1 – ×16)       |
 | P              | Pause                                            |
-| R / N          | New random level (Enter also works after a game ends) |
+| R / N          | New random level (asks first during a flight; Enter also works after a game ends) |
 | V              | Lunar Transfer / Solar System: toggle the whole-system view |
 | H              | Toggle help                                      |
-| Esc            | Back to the start screen (Esc there quits)       |
+| Esc            | Back to the start screen (asks first during a flight; Esc there quits) |
 
 ### Game controller
 
@@ -77,9 +77,12 @@ the game. The keyboard keeps working alongside.
 | B                   | 10% thrust (and fine turning while held)  |              |
 | LB / RB             | Time warp − / +                           |              |
 | Y                   | Whole-system view                         |              |
-| X                   | New orbit                                 |              |
 | Start               | Pause                                     | Start        |
-| Back / View         | Back to the start screen                  |              |
+| Back / View         | Back to the start screen (asks first)     |              |
+
+During a flight, leaving it or starting a new orbit asks first: time stops
+and a dialog waits for **Enter / A** (yes) or **Esc / B** (no). After a win
+or a crash there's nothing to lose, so these act right away.
 
 The yellow circle next to the ship marks the **prograde** direction (where the
 ship is moving). The red ✕ marks **retrograde**. Pe/Ap mark periapsis and

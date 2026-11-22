@@ -121,7 +121,38 @@ def test_start_pauses_and_back_returns_to_menu(game):
     assert w.paused
     _press(w, gp, vp, "start", down=False)
     _press(w, gp, vp, "back")
+    assert w.confirm == "leave" and left == []   # asks first
+    _press(w, gp, vp, "back", down=False)
+    _press(w, gp, vp, "a")
     assert left == [True]
+
+
+def test_back_then_b_cancels_and_resumes(game):
+    w, gp, vp = game
+    _press(w, gp, vp, "back")
+    assert w.confirm == "leave"
+    _press(w, gp, vp, "back", down=False)
+    _press(w, gp, vp, "b")
+    assert w.confirm is None and w.game.status == "playing"
+    _press(w, gp, vp, "b")           # still held: no fine thrust from the answer
+    assert not w.controls.thrust
+
+
+def test_controller_x_does_nothing(game):
+    w, gp, vp = game
+    target = w.game.target
+    _press(w, gp, vp, "x")
+    assert w.game.target is target and w.confirm is None
+
+
+def test_a_confirms_without_firing_the_engine(game):
+    w, gp, vp = game
+    _press(w, gp, vp, "back")
+    _press(w, gp, vp, "back", down=False)
+    w.exit_requested.connect(lambda: None)
+    _press(w, gp, vp, "a")           # yes
+    _press(w, gp, vp, "a")           # still held afterwards
+    assert not w.controls.thrust
 
 
 def test_button_held_from_the_menu_does_not_fire_the_engine(game):
