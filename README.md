@@ -132,6 +132,9 @@ makes burns finer: at ×0.25 a tap on Space changes your speed 4× less.
   (slingshot), and the prediction shows its effect before you get there.
 - The camera follows the body you are orbiting and zooms on a log scale;
   V shows the whole system.
+- Planets and moons are lit by the Sun: their bright side faces it, so even
+  zoomed in on a planet you can tell which way the Sun is (and which side of
+  your orbit faces it).
 
 ### Gravity assists
 

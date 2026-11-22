@@ -442,11 +442,19 @@ class GameWidget(QWidget):
         s = self.scale
         font = QFont("sans-serif")
         font.setPixelSize(11)
+        sun = self.to_screen(*gm.body_position(gm.root))
         for b in gm.bodies.values():
             c = self.to_screen(*gm.body_position(b.name))
             min_px = 6.0 if b.parent is None else 2.5
             r_px = max(b.radius * s, min_px)
-            draw_body(p, b.name, c, r_px)
+            # Lit by the Sun: the bright side faces it, even when it's far
+            # off-screen, so you can tell which way it is.
+            light = None
+            dx, dy = sun.x() - c.x(), sun.y() - c.y()
+            n = math.hypot(dx, dy)
+            if b.parent is not None and n > 1e-6:
+                light = (dx / n, dy / n)
+            draw_body(p, b.name, c, r_px, light)
             # Label small bodies, unless they sit on top of their parent.
             if r_px < 30 and (b.parent is None or b.distance * s > 14):
                 p.setFont(font)

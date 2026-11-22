@@ -8,6 +8,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ## [Unreleased]
 
 ### Added
+- Solar System mode: planets and moons are lit by the Sun (bright side
+  towards it, shaded night side), so the Sun's direction is visible even
+  when zoomed in on a planet. Other modes and the start screen keep their
+  look.
 - Solar System mode: two target orbits in every level, around the gas giant
   (easy to reach, expensive) and around the small red planet (cheap, much
   harder: tiny SOI, small fast orbits, capture needs early braking).

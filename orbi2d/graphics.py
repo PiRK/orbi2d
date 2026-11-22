@@ -9,7 +9,16 @@ import math
 import random
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPolygonF, QRadialGradient
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPolygonF,
+    QRadialGradient,
+)
 
 BG = QColor(6, 8, 18)
 CURRENT_COLOR = QColor(80, 190, 255)
@@ -36,9 +45,35 @@ def draw_stars(p: QPainter, stars: list[Star], width: int, height: int) -> None:
         p.drawPoint(QPointF(sx * width, sy * height))
 
 
-def draw_planet(p: QPainter, c: QPointF, r: float) -> None:
-    """Blue planet of screen radius ``r`` centred on ``c``."""
-    grad = QRadialGradient(c + QPointF(-0.35 * r, -0.35 * r), 1.3 * r)
+Light = tuple[float, float]  # unit vector (screen coordinates) towards the light
+
+
+def _highlight(c: QPointF, r: float, light: Light | None) -> QPointF:
+    """Brightest point of a lit sphere: towards the light, or the classic
+    top-left when there's no light source (no Sun on screen)."""
+    if light is None:
+        return c + QPointF(-0.35 * r, -0.35 * r)
+    return c + QPointF(0.45 * r * light[0], 0.45 * r * light[1])
+
+
+def _night_side(p: QPainter, c: QPointF, r: float, light: Light | None) -> None:
+    """Shade the half of a sphere facing away from the light."""
+    if light is None or r < 1.5:
+        return
+    lx, ly = light
+    grad = QLinearGradient(c + QPointF(0.15 * r * lx, 0.15 * r * ly), c - QPointF(r * lx, r * ly))
+    grad.setColorAt(0.0, QColor(2, 3, 10, 0))
+    grad.setColorAt(0.35, QColor(2, 3, 10, 150))
+    grad.setColorAt(1.0, QColor(2, 3, 10, 235))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(grad))
+    p.drawEllipse(c, r, r)
+
+
+def draw_planet(p: QPainter, c: QPointF, r: float, light: Light | None = None) -> None:
+    """Blue planet of screen radius ``r`` centred on ``c``, lit from
+    ``light`` (a unit vector towards the light source) if given."""
+    grad = QRadialGradient(_highlight(c, r, light), 1.3 * r)
     grad.setColorAt(0.0, QColor(120, 170, 255))
     grad.setColorAt(0.6, QColor(40, 90, 190))
     grad.setColorAt(1.0, QColor(10, 25, 70))
@@ -51,23 +86,25 @@ def draw_planet(p: QPainter, c: QPointF, r: float) -> None:
     p.drawEllipse(c, r * 1.25, r * 1.25)
     p.setBrush(QBrush(grad))
     p.drawEllipse(c, r, r)
+    _night_side(p, c, r, light)
 
 
-def draw_moon(p: QPainter, c: QPointF, r: float) -> None:
+def draw_moon(p: QPainter, c: QPointF, r: float, light: Light | None = None) -> None:
     """Grey moon of screen radius ``r`` centred on ``c``."""
-    grad = QRadialGradient(c + QPointF(-0.35 * r, -0.35 * r), 1.3 * r)
+    grad = QRadialGradient(_highlight(c, r, light), 1.3 * r)
     grad.setColorAt(0.0, QColor(225, 222, 210))
     grad.setColorAt(0.6, QColor(150, 146, 138))
     grad.setColorAt(1.0, QColor(55, 54, 52))
     p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(QBrush(grad))
     p.drawEllipse(c, r, r)
+    _night_side(p, c, r, light)
 
 
-def _draw_ball(p: QPainter, c: QPointF, r: float, light: QColor, mid: QColor,
-               dark: QColor) -> None:
-    grad = QRadialGradient(c + QPointF(-0.35 * r, -0.35 * r), 1.3 * r)
-    grad.setColorAt(0.0, light)
+def _draw_ball(p: QPainter, c: QPointF, r: float, bright: QColor, mid: QColor,
+               dark: QColor, light: Light | None) -> None:
+    grad = QRadialGradient(_highlight(c, r, light), 1.3 * r)
+    grad.setColorAt(0.0, bright)
     grad.setColorAt(0.6, mid)
     grad.setColorAt(1.0, dark)
     p.setPen(Qt.PenStyle.NoPen)
@@ -75,7 +112,7 @@ def _draw_ball(p: QPainter, c: QPointF, r: float, light: QColor, mid: QColor,
     p.drawEllipse(c, r, r)
 
 
-def draw_sun(p: QPainter, c: QPointF, r: float) -> None:
+def draw_sun(p: QPainter, c: QPointF, r: float, light: Light | None = None) -> None:
     """Yellow-white star with a soft corona."""
     glow = QRadialGradient(c, r * 2.2)
     glow.setColorAt(0.4, QColor(255, 210, 120, 120))
@@ -91,14 +128,16 @@ def draw_sun(p: QPainter, c: QPointF, r: float) -> None:
     p.drawEllipse(c, r, r)
 
 
-def draw_red_planet(p: QPainter, c: QPointF, r: float) -> None:
-    _draw_ball(p, c, r, QColor(240, 150, 110), QColor(180, 75, 45), QColor(60, 20, 12))
+def draw_red_planet(p: QPainter, c: QPointF, r: float, light: Light | None = None) -> None:
+    _draw_ball(p, c, r, QColor(240, 150, 110), QColor(180, 75, 45), QColor(60, 20, 12), light)
+    _night_side(p, c, r, light)
 
 
-def draw_gas_giant(p: QPainter, c: QPointF, r: float) -> None:
+def draw_gas_giant(p: QPainter, c: QPointF, r: float, light: Light | None = None) -> None:
     """Banded tan giant."""
-    _draw_ball(p, c, r, QColor(245, 225, 190), QColor(200, 155, 105), QColor(70, 45, 30))
+    _draw_ball(p, c, r, QColor(245, 225, 190), QColor(200, 155, 105), QColor(70, 45, 30), light)
     if r < 6:
+        _night_side(p, c, r, light)
         return
     p.save()
     clip = QPainterPath()
@@ -108,17 +147,19 @@ def draw_gas_giant(p: QPainter, c: QPointF, r: float) -> None:
         band = QColor(150, 100, 65, 110) if i % 2 == 0 else QColor(235, 205, 160, 90)
         p.fillRect(QRectF(c.x() - r, c.y() + dy * r, 2 * r, w * r), band)
     p.restore()
+    _night_side(p, c, r, light)   # over the bands
 
 
-def draw_body(p: QPainter, name: str, c: QPointF, r: float) -> None:
-    """Draw the body called ``name`` (see game.py) with radius ``r`` px."""
+def draw_body(p: QPainter, name: str, c: QPointF, r: float, light: Light | None = None) -> None:
+    """Draw the body called ``name`` (see game.py) with radius ``r`` px, lit
+    from ``light`` (unit vector towards the light) if given."""
     {
         "sun": draw_sun,
         "planet": draw_planet,
         "moon": draw_moon,
         "red": draw_red_planet,
         "giant": draw_gas_giant,
-    }.get(name, draw_moon)(p, c, r)
+    }.get(name, draw_moon)(p, c, r, light)
 
 
 def draw_ship(p: QPainter, pos: QPointF, heading: float, *, thrust: str | None = None,
